@@ -8,23 +8,24 @@ import objc
 from GlyphsApp import Glyphs, GSPath, GSNode, LINE, CURVE, OFFCURVE
 from GlyphsApp.plugins import SelectTool
 from AppKit import (
-    NSAttributedString,
     NSBezierPath,
     NSColor,
-    NSFont,
-    NSFontAttributeName,
-    NSForegroundColorAttributeName,
     NSMakePoint,
     NSMakeRect,
 )
-from Foundation import NSString
+
+try:
+    from AppKit import NSEventModifierFlagCommand, NSEventModifierFlagShift
+except Exception:
+    NSEventModifierFlagShift = 1 << 17
+    NSEventModifierFlagCommand = 1 << 20
 
 RESOURCE_DIR = os.path.dirname(os.path.abspath(__file__))
 if RESOURCE_DIR not in sys.path:
     sys.path.insert(0, RESOURCE_DIR)
 
 from hofmann_geometry import GridNode, grid_origin, node_point
-from hofmann_geometry import Point, create_tangent_candidates, is_closed_contour
+from hofmann_geometry import Point, create_tangent_candidate, create_tangent_candidates, is_closed_contour
 from hofmann_geometry import (
     arc_to_bezier_segments,
     candidate_radius,
@@ -32,11 +33,7 @@ from hofmann_geometry import (
 
 
 PREF = "com.palf.HofmannTool"
-
-
-def _bool_default(key, fallback):
-    value = Glyphs.defaults.get(PREF + "." + key, fallback)
-    return bool(value)
+MAX_HISTORY = 100
 
 
 def _int_default(key, fallback):
@@ -79,12 +76,7 @@ class HofmannTool(SelectTool):
     xOffsetTextField = objc.IBOutlet()
     yOffsetTextField = objc.IBOutlet()
     outputModeSegmentedControl = objc.IBOutlet()
-    showGridCheckBox = objc.IBOutlet()
-    showNodesCheckBox = objc.IBOutlet()
-    showCandidatesCheckBox = objc.IBOutlet()
-    showLabelsCheckBox = objc.IBOutlet()
     applyButton = objc.IBOutlet()
-    undoButton = objc.IBOutlet()
     clearButton = objc.IBOutlet()
 
     @objc.python_method
@@ -101,11 +93,9 @@ class HofmannTool(SelectTool):
 
     @objc.python_method
     def start(self):
-        self._preview_segments = []
-        self._candidate_segments = []
-        self._start_node = None
-        self._active_node = None
-        self._closed = False
+        self._undo_stack = []
+        self._redo_stack = []
+        self._reset_interaction_state()
 
     def view(self):
         return self.inspectorDialogView
@@ -128,10 +118,6 @@ class HofmannTool(SelectTool):
             "xOffset": 0.0,
             "yOffset": 0.0,
             "outputMode": "filled",
-            "showGrid": True,
-            "showNodes": True,
-            "showCandidates": True,
-            "showLabels": False,
         }
 
     @objc.python_method
@@ -142,12 +128,7 @@ class HofmannTool(SelectTool):
         self._set_label(self.diameterLabel, {"en": "Dia", "ja": "直径"})
         self._set_label(self.xOffsetLabel, {"en": "X", "ja": "X"})
         self._set_label(self.yOffsetLabel, {"en": "Y", "ja": "Y"})
-        self._set_button_title(self.showGridCheckBox, {"en": "Grid", "ja": "グリッド"})
-        self._set_button_title(self.showNodesCheckBox, {"en": "Nodes", "ja": "ノード"})
-        self._set_button_title(self.showCandidatesCheckBox, {"en": "Candidates", "ja": "候補"})
-        self._set_button_title(self.showLabelsCheckBox, {"en": "Labels", "ja": "ラベル"})
         self._set_button_title(self.applyButton, {"en": "Apply", "ja": "適用"})
-        self._set_button_title(self.undoButton, {"en": "Undo", "ja": "戻す"})
         self._set_button_title(self.clearButton, {"en": "Clear", "ja": "消去"})
         if self.outputModeSegmentedControl is not None:
             self.outputModeSegmentedControl.setLabel_forSegment_(Glyphs.localize({"en": "Filled", "ja": "塗り"}), 0)
@@ -190,30 +171,8 @@ class HofmannTool(SelectTool):
                 field.setTextColor_(field_colour)
                 field.setBackgroundColor_(NSColor.whiteColor())
 
-        for button in (
-            self.showGridCheckBox,
-            self.showNodesCheckBox,
-            self.showCandidatesCheckBox,
-            self.showLabelsCheckBox,
-        ):
-            self._set_button_title_colour(button, label_colour)
-        # Action buttons (Apply/Undo/Clear) keep the system bezeled appearance -
-        # don't override their title attributes or they look like flat labels.
-
-    @objc.python_method
-    def _set_button_title_colour(self, button, colour):
-        if button is None:
-            return
-        font = button.font()
-        if font is None:
-            font = NSFont.systemFontOfSize_(NSFont.smallSystemFontSize())
-        title = button.title()
-        attrs = {
-            NSForegroundColorAttributeName: colour,
-            NSFontAttributeName: font,
-        }
-        attr_title = NSAttributedString.alloc().initWithString_attributes_(title, attrs)
-        button.setAttributedTitle_(attr_title)
+        # Action buttons keep the system bezeled appearance; overriding the
+        # attributed title makes them look like flat labels in Glyphs.
 
     @objc.python_method
     def _settings_from_defaults(self):
@@ -225,10 +184,6 @@ class HofmannTool(SelectTool):
         s["xOffset"] = _float_default("xOffset", s["xOffset"])
         s["yOffset"] = _float_default("yOffset", s["yOffset"])
         s["outputMode"] = Glyphs.defaults.get(PREF + ".outputMode", s["outputMode"])
-        s["showGrid"] = _bool_default("showGrid", s["showGrid"])
-        s["showNodes"] = _bool_default("showNodes", s["showNodes"])
-        s["showCandidates"] = _bool_default("showCandidates", s["showCandidates"])
-        s["showLabels"] = _bool_default("showLabels", s["showLabels"])
         if s["outputMode"] not in ("filled", "centerline"):
             s["outputMode"] = "filled"
         return s
@@ -244,10 +199,6 @@ class HofmannTool(SelectTool):
         self._set_field_value(self.yOffsetTextField, s["yOffset"])
         if self.outputModeSegmentedControl:
             self.outputModeSegmentedControl.setSelectedSegment_(1 if s["outputMode"] == "centerline" else 0)
-        self._set_checkbox_state(self.showGridCheckBox, s["showGrid"])
-        self._set_checkbox_state(self.showNodesCheckBox, s["showNodes"])
-        self._set_checkbox_state(self.showCandidatesCheckBox, s["showCandidates"])
-        self._set_checkbox_state(self.showLabelsCheckBox, s["showLabels"])
 
     @objc.python_method
     def _save_settings_from_ui(self):
@@ -260,10 +211,6 @@ class HofmannTool(SelectTool):
         s["yOffset"] = self._read_float(self.yOffsetTextField, s["yOffset"])
         if self.outputModeSegmentedControl and self.outputModeSegmentedControl.selectedSegment() == 1:
             s["outputMode"] = "centerline"
-        s["showGrid"] = self._checkbox_on(self.showGridCheckBox, s["showGrid"])
-        s["showNodes"] = self._checkbox_on(self.showNodesCheckBox, s["showNodes"])
-        s["showCandidates"] = self._checkbox_on(self.showCandidatesCheckBox, s["showCandidates"])
-        s["showLabels"] = self._checkbox_on(self.showLabelsCheckBox, s["showLabels"])
 
         d = Glyphs.defaults
         d[PREF + ".rows"] = s["rows"]
@@ -273,10 +220,6 @@ class HofmannTool(SelectTool):
         d[PREF + ".xOffset"] = s["xOffset"]
         d[PREF + ".yOffset"] = s["yOffset"]
         d[PREF + ".outputMode"] = s["outputMode"]
-        d[PREF + ".showGrid"] = s["showGrid"]
-        d[PREF + ".showNodes"] = s["showNodes"]
-        d[PREF + ".showCandidates"] = s["showCandidates"]
-        d[PREF + ".showLabels"] = s["showLabels"]
         return s
 
     @objc.python_method
@@ -286,11 +229,6 @@ class HofmannTool(SelectTool):
                 field.setStringValue_(str(value))
             else:
                 field.setStringValue_("%g" % value)
-
-    @objc.python_method
-    def _set_checkbox_state(self, checkbox, value):
-        if checkbox is not None:
-            checkbox.setState_(1 if value else 0)
 
     @objc.python_method
     def _read_int(self, field, fallback):
@@ -305,12 +243,6 @@ class HofmannTool(SelectTool):
             return float(field.stringValue())
         except Exception:
             return float(fallback)
-
-    @objc.python_method
-    def _checkbox_on(self, checkbox, fallback):
-        if checkbox is None:
-            return bool(fallback)
-        return checkbox.state() == 1
 
     @objc.python_method
     def _layer_metrics(self, layer):
@@ -344,50 +276,179 @@ class HofmannTool(SelectTool):
         origin, points = self._grid_points(layer, s)
         return dict(points)
 
-    def mouseDown_(self, event):
-        loc = self.editViewController().graphicView().getActiveLocation_(event)
-        layer = self.editViewController().graphicView().activeLayer()
-        if layer is None:
-            return
-        s = self._save_settings_from_ui()
-        point = Point(float(loc.x), float(loc.y))
-        if self._candidate_segments:
-            candidate = self._nearest_candidate(point, s)
-            if candidate is not None:
-                self._accept_candidate(candidate)
-                Glyphs.redraw()
-                return
-        node = self._nearest_node(layer, point, s)
-        if node is not None:
-            self._handle_node_click(layer, node, s)
-            Glyphs.redraw()
-            return
-        objc.super(HofmannTool, self).mouseDown_(event)
+    @objc.python_method
+    def _ensure_interaction_storage(self):
+        if not hasattr(self, "_undo_stack"):
+            self._undo_stack = []
+        if not hasattr(self, "_redo_stack"):
+            self._redo_stack = []
+        if not hasattr(self, "_route_steps"):
+            self._reset_interaction_state()
 
     @objc.python_method
-    def _handle_node_click(self, layer, node, s):
-        if self._active_node is None or self._closed:
-            self._preview_segments = []
+    def _reset_interaction_state(self):
+        self._route_steps = []
+        self._preview_segments = []
+        self._candidate_segments = []
+        self._candidate_target_node = None
+        self._start_node = None
+        self._active_node = None
+        self._closed = False
+
+    @objc.python_method
+    def _node_snapshot(self, node):
+        if node is None:
+            return None
+        return (int(node.row), int(node.col))
+
+    @objc.python_method
+    def _node_from_snapshot(self, value):
+        if value is None:
+            return None
+        return GridNode(int(value[0]), int(value[1]))
+
+    @objc.python_method
+    def _snapshot_state(self):
+        self._ensure_interaction_storage()
+        return {
+            "route": [
+                (
+                    self._node_snapshot(step[0]),
+                    self._node_snapshot(step[1]),
+                    step[2],
+                    step[3],
+                )
+                for step in self._route_steps
+            ],
+            "start": self._node_snapshot(self._start_node),
+            "active": self._node_snapshot(self._active_node),
+            "target": self._node_snapshot(self._candidate_target_node),
+            "closed": bool(self._closed),
+        }
+
+    @objc.python_method
+    def _restore_state(self, snapshot):
+        self._ensure_interaction_storage()
+        self._route_steps = [
+            (
+                self._node_from_snapshot(step[0]),
+                self._node_from_snapshot(step[1]),
+                step[2],
+                step[3],
+            )
+            for step in snapshot.get("route", [])
+        ]
+        self._start_node = self._node_from_snapshot(snapshot.get("start"))
+        self._active_node = self._node_from_snapshot(snapshot.get("active"))
+        self._candidate_target_node = self._node_from_snapshot(snapshot.get("target"))
+        self._closed = bool(snapshot.get("closed", False))
+        self._preview_segments = []
+        self._candidate_segments = []
+        layer = self._current_layer()
+        if layer is not None:
+            self._refresh_geometry_from_settings(layer, self._save_settings_from_ui())
+
+    @objc.python_method
+    def _push_history(self):
+        self._ensure_interaction_storage()
+        snapshot = self._snapshot_state()
+        if self._undo_stack and self._undo_stack[-1] == snapshot:
+            return
+        self._undo_stack.append(snapshot)
+        if len(self._undo_stack) > MAX_HISTORY:
+            del self._undo_stack[0]
+        self._redo_stack = []
+
+    @objc.python_method
+    def _undo_history(self):
+        self._ensure_interaction_storage()
+        if not self._undo_stack:
+            return False
+        current = self._snapshot_state()
+        previous = self._undo_stack.pop()
+        self._redo_stack.append(current)
+        if len(self._redo_stack) > MAX_HISTORY:
+            del self._redo_stack[0]
+        self._restore_state(previous)
+        return True
+
+    @objc.python_method
+    def _redo_history(self):
+        self._ensure_interaction_storage()
+        if not self._redo_stack:
+            return False
+        current = self._snapshot_state()
+        next_snapshot = self._redo_stack.pop()
+        self._undo_stack.append(current)
+        if len(self._undo_stack) > MAX_HISTORY:
+            del self._undo_stack[0]
+        self._restore_state(next_snapshot)
+        return True
+
+    @objc.python_method
+    def _has_interaction_state(self):
+        self._ensure_interaction_storage()
+        return bool(self._route_steps or self._candidate_target_node or self._start_node or self._active_node)
+
+    @objc.python_method
+    def _route_step_for_candidate(self, candidate):
+        return (candidate.node_a, candidate.node_b, candidate.flow_a, candidate.flow_b)
+
+    @objc.python_method
+    def _candidate_for_route_step(self, step, point_map, diameter):
+        node_a, node_b, flow_a, flow_b = step
+        if node_a not in point_map or node_b not in point_map:
+            return None
+        return create_tangent_candidate(
+            node_a,
+            node_b,
+            point_map[node_a],
+            point_map[node_b],
+            diameter,
+            flow_a,
+            flow_b,
+        )
+
+    @objc.python_method
+    def _refresh_geometry_from_settings(self, layer, s):
+        self._ensure_interaction_storage()
+        point_map = self._grid_point_map(layer, s)
+        rebuilt_segments = []
+        for step in self._route_steps:
+            candidate = self._candidate_for_route_step(step, point_map, s["diameter"])
+            if candidate is None:
+                break
+            rebuilt_segments.append(candidate)
+
+        self._preview_segments = rebuilt_segments
+        route_is_valid = len(self._preview_segments) == len(self._route_steps)
+        self._closed = route_is_valid and is_closed_contour(self._preview_segments)
+        if self._closed:
+            self._active_node = None
             self._candidate_segments = []
-            self._start_node = node
-            self._active_node = node
-            self._closed = False
-            return
-        if node == self._active_node:
-            return
+            self._candidate_target_node = None
+        elif self._preview_segments:
+            self._active_node = self._preview_segments[-1].node_b
+        elif self._start_node is not None:
+            self._active_node = self._start_node
+
+        if route_is_valid and self._candidate_target_node is not None and self._active_node is not None:
+            self._candidate_segments = self._candidates_for_target(layer, self._candidate_target_node, s)
+        else:
+            self._candidate_segments = []
+
+    @objc.python_method
+    def _candidates_for_target(self, layer, node, s):
+        if self._active_node is None or node == self._active_node:
+            return []
         point_map = self._grid_point_map(layer, s)
         if self._active_node not in point_map or node not in point_map:
-            self._preview_segments = []
-            self._candidate_segments = []
-            self._start_node = node
-            self._active_node = node
-            self._closed = False
-            return
+            return []
         required_flow_a = self._preview_segments[-1].flow_b if self._preview_segments else None
         required_flow_b = None
         if self._preview_segments and node == self._start_node:
             required_flow_b = self._preview_segments[0].flow_a
-        self._candidate_segments = create_tangent_candidates(
+        return create_tangent_candidates(
             self._active_node,
             node,
             point_map[self._active_node],
@@ -397,14 +458,76 @@ class HofmannTool(SelectTool):
             required_flow_b=required_flow_b,
         )
 
+    def mouseDown_(self, event):
+        loc = self.editViewController().graphicView().getActiveLocation_(event)
+        layer = self.editViewController().graphicView().activeLayer()
+        if layer is None:
+            return
+        s = self._save_settings_from_ui()
+        self._refresh_geometry_from_settings(layer, s)
+        point = Point(float(loc.x), float(loc.y))
+        if self._candidate_segments:
+            candidate = self._nearest_candidate(point, s)
+            if candidate is not None:
+                self._accept_candidate(layer, candidate, s)
+                Glyphs.redraw()
+                return
+        node = self._nearest_node(layer, point, s)
+        if node is not None:
+            self._handle_node_click(layer, node, s)
+            Glyphs.redraw()
+            return
+        objc.super(HofmannTool, self).mouseDown_(event)
+
+    def keyDown_(self, event):
+        self._ensure_interaction_storage()
+        try:
+            chars = event.charactersIgnoringModifiers()
+            chars = chars.lower() if chars is not None else ""
+            flags = event.modifierFlags()
+        except Exception:
+            chars = ""
+            flags = 0
+
+        if chars == "z" and (flags & NSEventModifierFlagCommand):
+            if flags & NSEventModifierFlagShift:
+                handled = self._redo_history()
+            else:
+                handled = self._undo_history()
+            if handled:
+                Glyphs.redraw()
+                return
+        try:
+            objc.super(HofmannTool, self).keyDown_(event)
+        except AttributeError:
+            pass
+
     @objc.python_method
-    def _accept_candidate(self, candidate):
-        self._preview_segments.append(candidate)
+    def _handle_node_click(self, layer, node, s):
+        if self._active_node is None or self._closed:
+            self._push_history()
+            self._route_steps = []
+            self._preview_segments = []
+            self._candidate_segments = []
+            self._candidate_target_node = None
+            self._start_node = node
+            self._active_node = node
+            self._closed = False
+            return
+        if node == self._active_node:
+            return
+        self._push_history()
+        self._candidate_target_node = node
+        self._candidate_segments = self._candidates_for_target(layer, node, s)
+
+    @objc.python_method
+    def _accept_candidate(self, layer, candidate, s):
+        self._push_history()
+        self._route_steps.append(self._route_step_for_candidate(candidate))
         self._candidate_segments = []
+        self._candidate_target_node = None
         self._active_node = candidate.node_b
-        self._closed = is_closed_contour(self._preview_segments)
-        if self._closed:
-            self._active_node = None
+        self._refresh_geometry_from_settings(layer, s)
 
     @objc.python_method
     def _nearest_node(self, layer, point, s):
@@ -448,23 +571,19 @@ class HofmannTool(SelectTool):
     @objc.python_method
     def background(self, layer):
         s = self._settings_from_defaults()
+        self._refresh_geometry_from_settings(layer, s)
         try:
             scale = self.editViewController().graphicView().scale()
         except Exception:
             scale = 1.0
         line_width = 1.0 / scale if scale else 1.0
         origin, points = self._grid_points(layer, s)
-        if s["showGrid"]:
-            self._draw_grid(points, s, line_width)
-        if s["showNodes"]:
-            self._draw_diameter_circles(points, s, line_width)
-            self._draw_node_dots(points, scale)
+        self._draw_grid(points, s, line_width)
+        self._draw_diameter_circles(points, s, line_width)
+        self._draw_node_dots(points, scale)
         self._draw_active_circles(points, s, line_width)
         self._draw_preview_segments(line_width)
-        if s["showCandidates"]:
-            self._draw_candidate_segments(line_width)
-        if s["showLabels"]:
-            self._draw_labels(points, scale)
+        self._draw_candidate_segments(line_width)
 
     @objc.python_method
     def _draw_grid(self, points, s, line_width):
@@ -624,25 +743,17 @@ class HofmannTool(SelectTool):
                 NSMakePoint(p2.x, p2.y),
             )
 
-    @objc.python_method
-    def _draw_labels(self, points, scale):
-        font_size = max(7.0, 9.0 / scale if scale else 9.0)
-        attrs = {
-            NSFontAttributeName: NSFont.systemFontOfSize_(font_size),
-            NSForegroundColorAttributeName: NSColor.colorWithCalibratedWhite_alpha_(0.0, 0.45),
-        }
-        offset = 5.0 / scale if scale else 5.0
-        for node, point in points:
-            text = NSString.stringWithString_("%d,%d" % (node.row, node.col))
-            text.drawAtPoint_withAttributes_(NSMakePoint(point.x + offset, point.y + offset), attrs)
-
     @objc.IBAction
     def handleSettingsAction_(self, sender):
-        self._save_settings_from_ui()
+        s = self._save_settings_from_ui()
+        layer = self._current_layer()
+        if layer is not None:
+            self._refresh_geometry_from_settings(layer, s)
         Glyphs.redraw()
 
     @objc.IBAction
     def applyAction_(self, sender):
+        self._ensure_interaction_storage()
         s = self._save_settings_from_ui()
         layer = self._current_layer()
         if layer is None:
@@ -650,6 +761,9 @@ class HofmannTool(SelectTool):
             return
         if not self._preview_segments:
             print("HofmannTool: nothing to apply yet - pick at least one tangent.")
+            return
+        if len(self._preview_segments) != len(self._route_steps):
+            print("HofmannTool: current diameter/spacing makes part of the route invalid.")
             return
         if s["outputMode"] == "filled" and not self._closed:
             print("HofmannTool: Filled mode requires a closed contour. Close the loop or switch to Line mode.")
@@ -662,6 +776,9 @@ class HofmannTool(SelectTool):
         if path is None:
             return
         self._append_path_to_layer(layer, path)
+        self._undo_stack = []
+        self._redo_stack = []
+        self._reset_interaction_state()
         Glyphs.redraw()
 
     @objc.python_method
@@ -744,25 +861,11 @@ class HofmannTool(SelectTool):
                     pass
 
     @objc.IBAction
-    def undoStepAction_(self, sender):
-        self._candidate_segments = []
-        if self._preview_segments:
-            self._preview_segments.pop()
-        self._closed = is_closed_contour(self._preview_segments)
-        if self._preview_segments:
-            self._active_node = self._preview_segments[-1].node_b
-        else:
-            self._active_node = self._start_node
-        Glyphs.redraw()
-
-    @objc.IBAction
     def clearAction_(self, sender):
-        self._preview_segments = []
-        self._candidate_segments = []
-        self._start_node = None
-        self._active_node = None
-        self._closed = False
-        Glyphs.redraw()
+        if self._has_interaction_state():
+            self._push_history()
+            self._reset_interaction_state()
+            Glyphs.redraw()
 
     @objc.python_method
     def __file__(self):

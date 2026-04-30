@@ -8,6 +8,7 @@ import objc
 from GlyphsApp import Glyphs
 from GlyphsApp.plugins import SelectTool
 from AppKit import (
+    NSAttributedString,
     NSBezierPath,
     NSColor,
     NSFont,
@@ -61,6 +62,12 @@ class HofmannTool(SelectTool):
 
     inspectorDialog = objc.IBOutlet()
     inspectorDialogView = objc.IBOutlet()
+    rowsLabel = objc.IBOutlet()
+    colsLabel = objc.IBOutlet()
+    spacingLabel = objc.IBOutlet()
+    diameterLabel = objc.IBOutlet()
+    xOffsetLabel = objc.IBOutlet()
+    yOffsetLabel = objc.IBOutlet()
     rowsTextField = objc.IBOutlet()
     colsTextField = objc.IBOutlet()
     spacingTextField = objc.IBOutlet()
@@ -84,6 +91,8 @@ class HofmannTool(SelectTool):
         })
         self.keyboardShortcut = "h"
         self.loadNib("InspectorView", __file__)
+        self._localize_ui()
+        self._apply_readable_colours()
         self._load_settings_to_ui()
 
     @objc.python_method
@@ -120,6 +129,88 @@ class HofmannTool(SelectTool):
             "showCandidates": True,
             "showLabels": False,
         }
+
+    @objc.python_method
+    def _localize_ui(self):
+        self._set_label(self.rowsLabel, {"en": "R", "ja": "行"})
+        self._set_label(self.colsLabel, {"en": "C", "ja": "列"})
+        self._set_label(self.spacingLabel, {"en": "Spacing", "ja": "間隔"})
+        self._set_label(self.diameterLabel, {"en": "Dia", "ja": "直径"})
+        self._set_label(self.xOffsetLabel, {"en": "X", "ja": "X"})
+        self._set_label(self.yOffsetLabel, {"en": "Y", "ja": "Y"})
+        self._set_button_title(self.showGridCheckBox, {"en": "Grid", "ja": "グリッド"})
+        self._set_button_title(self.showNodesCheckBox, {"en": "Nodes", "ja": "ノード"})
+        self._set_button_title(self.showCandidatesCheckBox, {"en": "Candidates", "ja": "候補"})
+        self._set_button_title(self.showLabelsCheckBox, {"en": "Labels", "ja": "ラベル"})
+        self._set_button_title(self.applyButton, {"en": "Apply", "ja": "適用"})
+        self._set_button_title(self.undoButton, {"en": "Undo", "ja": "戻す"})
+        self._set_button_title(self.clearButton, {"en": "Clear", "ja": "消去"})
+        if self.outputModeSegmentedControl is not None:
+            self.outputModeSegmentedControl.setLabel_forSegment_(Glyphs.localize({"en": "Filled", "ja": "塗り"}), 0)
+            self.outputModeSegmentedControl.setLabel_forSegment_(Glyphs.localize({"en": "Line", "ja": "線"}), 1)
+
+    @objc.python_method
+    def _set_label(self, label, localized):
+        if label is not None:
+            label.setStringValue_(Glyphs.localize(localized))
+
+    @objc.python_method
+    def _set_button_title(self, button, localized):
+        if button is not None:
+            button.setTitle_(Glyphs.localize(localized))
+
+    @objc.python_method
+    def _apply_readable_colours(self):
+        label_colour = NSColor.colorWithCalibratedWhite_alpha_(0.0, 0.78)
+        field_colour = NSColor.colorWithCalibratedWhite_alpha_(0.0, 1.0)
+        for label in (
+            self.rowsLabel,
+            self.colsLabel,
+            self.spacingLabel,
+            self.diameterLabel,
+            self.xOffsetLabel,
+            self.yOffsetLabel,
+        ):
+            if label is not None:
+                label.setTextColor_(label_colour)
+
+        for field in (
+            self.rowsTextField,
+            self.colsTextField,
+            self.spacingTextField,
+            self.diameterTextField,
+            self.xOffsetTextField,
+            self.yOffsetTextField,
+        ):
+            if field is not None:
+                field.setTextColor_(field_colour)
+                field.setBackgroundColor_(NSColor.whiteColor())
+
+        for button in (
+            self.showGridCheckBox,
+            self.showNodesCheckBox,
+            self.showCandidatesCheckBox,
+            self.showLabelsCheckBox,
+            self.applyButton,
+            self.undoButton,
+            self.clearButton,
+        ):
+            self._set_button_title_colour(button, label_colour)
+
+    @objc.python_method
+    def _set_button_title_colour(self, button, colour):
+        if button is None:
+            return
+        font = button.font()
+        if font is None:
+            font = NSFont.systemFontOfSize_(NSFont.smallSystemFontSize())
+        title = button.title()
+        attrs = {
+            NSForegroundColorAttributeName: colour,
+            NSFontAttributeName: font,
+        }
+        attr_title = NSAttributedString.alloc().initWithString_attributes_(title, attrs)
+        button.setAttributedTitle_(attr_title)
 
     @objc.python_method
     def _settings_from_defaults(self):

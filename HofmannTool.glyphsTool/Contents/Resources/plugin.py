@@ -23,6 +23,7 @@ if RESOURCE_DIR not in sys.path:
     sys.path.insert(0, RESOURCE_DIR)
 
 from hofmann_geometry import GridNode, grid_origin, node_point
+from hofmann_geometry import Point, create_tangent_candidates, is_closed_contour
 
 
 PREF = "com.palf.HofmannTool"
@@ -58,6 +59,7 @@ class HofmannToolInspectorView(GSInspectorView):
 
 class HofmannTool(SelectTool):
 
+    inspectorDialog = objc.IBOutlet()
     inspectorDialogView = objc.IBOutlet()
     rowsTextField = objc.IBOutlet()
     colsTextField = objc.IBOutlet()
@@ -88,8 +90,12 @@ class HofmannTool(SelectTool):
     def start(self):
         self._preview_segments = []
         self._candidate_segments = []
-        self._selected_node = None
-        self._target_node = None
+        self._start_node = None
+        self._active_node = None
+        self._closed = False
+
+    def view(self):
+        return self.inspectorDialogView
 
     @objc.python_method
     def activate(self):
@@ -240,6 +246,112 @@ class HofmannTool(SelectTool):
         return origin, points
 
     @objc.python_method
+    def _grid_point_map(self, layer, s):
+        origin, points = self._grid_points(layer, s)
+        return dict(points)
+
+    def mouseDown_(self, event):
+        loc = self.editViewController().graphicView().getActiveLocation_(event)
+        layer = self.editViewController().graphicView().activeLayer()
+        if layer is None:
+            return
+        s = self._save_settings_from_ui()
+        point = Point(float(loc.x), float(loc.y))
+        if self._candidate_segments:
+            candidate = self._nearest_candidate(point, s)
+            if candidate is not None:
+                self._accept_candidate(candidate)
+                Glyphs.redraw()
+                return
+        node = self._nearest_node(layer, point, s)
+        if node is not None:
+            self._handle_node_click(layer, node, s)
+            Glyphs.redraw()
+            return
+        objc.super(HofmannTool, self).mouseDown_(event)
+
+    @objc.python_method
+    def _handle_node_click(self, layer, node, s):
+        if self._active_node is None or self._closed:
+            self._preview_segments = []
+            self._candidate_segments = []
+            self._start_node = node
+            self._active_node = node
+            self._closed = False
+            return
+        if node == self._active_node:
+            return
+        point_map = self._grid_point_map(layer, s)
+        if self._active_node not in point_map or node not in point_map:
+            self._preview_segments = []
+            self._candidate_segments = []
+            self._start_node = node
+            self._active_node = node
+            self._closed = False
+            return
+        required_flow_a = self._preview_segments[-1].flow_b if self._preview_segments else None
+        required_flow_b = None
+        if self._preview_segments and node == self._start_node:
+            required_flow_b = self._preview_segments[0].flow_a
+        self._candidate_segments = create_tangent_candidates(
+            self._active_node,
+            node,
+            point_map[self._active_node],
+            point_map[node],
+            s["diameter"],
+            required_flow_a=required_flow_a,
+            required_flow_b=required_flow_b,
+        )
+
+    @objc.python_method
+    def _accept_candidate(self, candidate):
+        self._preview_segments.append(candidate)
+        self._candidate_segments = []
+        self._active_node = candidate.node_b
+        self._closed = is_closed_contour(self._preview_segments)
+        if self._closed:
+            self._active_node = None
+
+    @objc.python_method
+    def _nearest_node(self, layer, point, s):
+        try:
+            scale = self.editViewController().graphicView().scale()
+        except Exception:
+            scale = 1.0
+        threshold = max(8.0 / scale if scale else 8.0, min(s["spacing"] * 0.22, s["diameter"] * 0.35))
+        nearest = None
+        nearest_distance = None
+        for node, center in self._grid_points(layer, s)[1]:
+            distance = point.sub(center).length()
+            if distance <= threshold and (nearest_distance is None or distance < nearest_distance):
+                nearest = node
+                nearest_distance = distance
+        return nearest
+
+    @objc.python_method
+    def _nearest_candidate(self, point, s):
+        threshold = max(5.0, min(s["spacing"] * 0.12, 12.0))
+        nearest = None
+        nearest_distance = None
+        for candidate in self._candidate_segments:
+            distance = self._distance_to_segment(point, candidate.point_a, candidate.point_b)
+            if distance <= threshold and (nearest_distance is None or distance < nearest_distance):
+                nearest = candidate
+                nearest_distance = distance
+        return nearest
+
+    @objc.python_method
+    def _distance_to_segment(self, point, start, end):
+        segment = end.sub(start)
+        length_sq = segment.x * segment.x + segment.y * segment.y
+        if length_sq <= 0.0:
+            return point.sub(start).length()
+        t = ((point.x - start.x) * segment.x + (point.y - start.y) * segment.y) / length_sq
+        t = max(0.0, min(1.0, t))
+        projection = Point(start.x + segment.x * t, start.y + segment.y * t)
+        return point.sub(projection).length()
+
+    @objc.python_method
     def background(self, layer):
         s = self._settings_from_defaults()
         if not (s["showGrid"] or s["showNodes"] or s["showLabels"]):
@@ -252,8 +364,12 @@ class HofmannTool(SelectTool):
         origin, points = self._grid_points(layer, s)
         if s["showGrid"]:
             self._draw_grid(points, s, line_width)
+        self._draw_preview_segments(line_width)
+        if s["showCandidates"]:
+            self._draw_candidate_segments(line_width)
         if s["showNodes"]:
             self._draw_nodes(points, s, scale)
+            self._draw_active_nodes(points, s, scale)
         if s["showLabels"]:
             self._draw_labels(points, scale)
 
@@ -294,6 +410,45 @@ class HofmannTool(SelectTool):
             NSBezierPath.bezierPathWithOvalInRect_(rect).fill()
 
     @objc.python_method
+    def _draw_active_nodes(self, points, s, scale):
+        point_map = dict(points)
+        radius = max(4.0 / scale if scale else 4.0, min(7.0, s["diameter"] * 0.07))
+        for node, color in (
+            (self._start_node, NSColor.colorWithCalibratedRed_green_blue_alpha_(0.1, 0.35, 1.0, 0.9)),
+            (self._active_node, NSColor.colorWithCalibratedRed_green_blue_alpha_(1.0, 0.35, 0.1, 0.9)),
+        ):
+            if node is None or node not in point_map:
+                continue
+            point = point_map[node]
+            color.set()
+            rect = NSMakeRect(point.x - radius, point.y - radius, radius * 2.0, radius * 2.0)
+            NSBezierPath.bezierPathWithOvalInRect_(rect).fill()
+
+    @objc.python_method
+    def _draw_preview_segments(self, line_width):
+        if not self._preview_segments:
+            return
+        NSColor.colorWithCalibratedRed_green_blue_alpha_(0.05, 0.25, 1.0, 0.9).set()
+        path = NSBezierPath.alloc().init()
+        path.setLineWidth_(max(line_width * 1.6, 1.0))
+        for candidate in self._preview_segments:
+            path.moveToPoint_(NSMakePoint(candidate.point_a.x, candidate.point_a.y))
+            path.lineToPoint_(NSMakePoint(candidate.point_b.x, candidate.point_b.y))
+        path.stroke()
+
+    @objc.python_method
+    def _draw_candidate_segments(self, line_width):
+        if not self._candidate_segments:
+            return
+        NSColor.colorWithCalibratedRed_green_blue_alpha_(1.0, 0.35, 0.0, 0.65).set()
+        path = NSBezierPath.alloc().init()
+        path.setLineWidth_(max(line_width * 1.3, 1.0))
+        for candidate in self._candidate_segments:
+            path.moveToPoint_(NSMakePoint(candidate.point_a.x, candidate.point_a.y))
+            path.lineToPoint_(NSMakePoint(candidate.point_b.x, candidate.point_b.y))
+        path.stroke()
+
+    @objc.python_method
     def _draw_labels(self, points, scale):
         font_size = max(7.0, 9.0 / scale if scale else 9.0)
         attrs = {
@@ -320,14 +475,20 @@ class HofmannTool(SelectTool):
         self._candidate_segments = []
         if self._preview_segments:
             self._preview_segments.pop()
+        self._closed = is_closed_contour(self._preview_segments)
+        if self._preview_segments:
+            self._active_node = self._preview_segments[-1].node_b
+        else:
+            self._active_node = self._start_node
         Glyphs.redraw()
 
     @objc.IBAction
     def clearAction_(self, sender):
         self._preview_segments = []
         self._candidate_segments = []
-        self._selected_node = None
-        self._target_node = None
+        self._start_node = None
+        self._active_node = None
+        self._closed = False
         Glyphs.redraw()
 
     @objc.python_method

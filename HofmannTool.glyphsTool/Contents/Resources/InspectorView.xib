@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="24412" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="NO" customObjectInstantitationMethod="direct">
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="24412" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES" customObjectInstantitationMethod="direct">
     <dependencies>
         <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="24412"/>
         <capability name="System colors introduced in macOS 10.14" minToolsVersion="10.0"/>
@@ -28,81 +28,103 @@
         </customObject>
         <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
         <customObject id="-3" userLabel="Application" customClass="NSObject"/>
-        <customView id="inspectorView" customClass="HofmannToolInspectorView">
-            <rect key="frame" x="0.0" y="0.0" width="180" height="286"/>
+        <customView id="inspectorView" customClass="HofmannToolInspectorView" translatesAutoresizingMaskIntoConstraints="NO">
+            <rect key="frame" x="0.0" y="0.0" width="360" height="104"/>
             <subviews>
                 <textField id="labelRows" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="10" y="258" width="62" height="17"/>
-                    <textFieldCell key="cell" title="Rows" id="cell-labelRows"/>
+                    <rect key="frame" x="8" y="76" width="16" height="17"/>
+                    <textFieldCell key="cell" controlSize="small" title="R" id="cell-labelRows">
+                        <font key="font" metaFont="smallSystem"/>
+                    </textFieldCell>
                 </textField>
                 <textField id="rowsField" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="82" y="255" width="86" height="22"/>
-                    <textFieldCell key="cell" scrollable="YES" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" alignment="right" title="4" drawsBackground="YES" id="cell-rowsField"/>
+                    <rect key="frame" x="25" y="73" width="36" height="22"/>
+                    <textFieldCell key="cell" controlSize="small" scrollable="YES" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" alignment="right" title="4" drawsBackground="YES" id="cell-rowsField">
+                        <font key="font" metaFont="smallSystem"/>
+                    </textFieldCell>
                     <connections>
                         <action selector="handleSettingsAction:" target="-2" id="act-rows"/>
                     </connections>
                 </textField>
                 <textField id="labelCols" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="10" y="232" width="62" height="17"/>
-                    <textFieldCell key="cell" title="Cols" id="cell-labelCols"/>
+                    <rect key="frame" x="68" y="76" width="16" height="17"/>
+                    <textFieldCell key="cell" controlSize="small" title="C" id="cell-labelCols">
+                        <font key="font" metaFont="smallSystem"/>
+                    </textFieldCell>
                 </textField>
                 <textField id="colsField" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="82" y="229" width="86" height="22"/>
-                    <textFieldCell key="cell" scrollable="YES" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" alignment="right" title="4" drawsBackground="YES" id="cell-colsField"/>
+                    <rect key="frame" x="85" y="73" width="36" height="22"/>
+                    <textFieldCell key="cell" controlSize="small" scrollable="YES" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" alignment="right" title="4" drawsBackground="YES" id="cell-colsField">
+                        <font key="font" metaFont="smallSystem"/>
+                    </textFieldCell>
                     <connections>
                         <action selector="handleSettingsAction:" target="-2" id="act-cols"/>
                     </connections>
                 </textField>
-                <box id="sepGrid" fixedFrame="YES" boxType="separator" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="10" y="214" width="158" height="5"/>
-                </box>
                 <textField id="labelSpacing" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="10" y="193" width="62" height="17"/>
-                    <textFieldCell key="cell" title="Spacing" id="cell-labelSpacing"/>
+                    <rect key="frame" x="132" y="76" width="46" height="17"/>
+                    <textFieldCell key="cell" controlSize="small" title="Spacing" id="cell-labelSpacing">
+                        <font key="font" metaFont="smallSystem"/>
+                    </textFieldCell>
                 </textField>
                 <textField id="spacingField" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="82" y="190" width="86" height="22"/>
-                    <textFieldCell key="cell" scrollable="YES" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" alignment="right" title="120" drawsBackground="YES" id="cell-spacingField"/>
+                    <rect key="frame" x="182" y="73" width="50" height="22"/>
+                    <textFieldCell key="cell" controlSize="small" scrollable="YES" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" alignment="right" title="120" drawsBackground="YES" id="cell-spacingField">
+                        <font key="font" metaFont="smallSystem"/>
+                    </textFieldCell>
                     <connections>
                         <action selector="handleSettingsAction:" target="-2" id="act-spacing"/>
                     </connections>
                 </textField>
                 <textField id="labelDiameter" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="10" y="167" width="62" height="17"/>
-                    <textFieldCell key="cell" title="Diameter" id="cell-labelDiameter"/>
+                    <rect key="frame" x="244" y="76" width="24" height="17"/>
+                    <textFieldCell key="cell" controlSize="small" title="Dia" id="cell-labelDiameter">
+                        <font key="font" metaFont="smallSystem"/>
+                    </textFieldCell>
                 </textField>
                 <textField id="diameterField" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="82" y="164" width="86" height="22"/>
-                    <textFieldCell key="cell" scrollable="YES" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" alignment="right" title="80" drawsBackground="YES" id="cell-diameterField"/>
+                    <rect key="frame" x="272" y="73" width="50" height="22"/>
+                    <textFieldCell key="cell" controlSize="small" scrollable="YES" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" alignment="right" title="80" drawsBackground="YES" id="cell-diameterField">
+                        <font key="font" metaFont="smallSystem"/>
+                    </textFieldCell>
                     <connections>
                         <action selector="handleSettingsAction:" target="-2" id="act-diameter"/>
                     </connections>
                 </textField>
                 <textField id="labelXOffset" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="10" y="141" width="62" height="17"/>
-                    <textFieldCell key="cell" title="X Offset" id="cell-labelXOffset"/>
+                    <rect key="frame" x="8" y="47" width="36" height="17"/>
+                    <textFieldCell key="cell" controlSize="small" title="X Off" id="cell-labelXOffset">
+                        <font key="font" metaFont="smallSystem"/>
+                    </textFieldCell>
                 </textField>
                 <textField id="xOffsetField" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="82" y="138" width="86" height="22"/>
-                    <textFieldCell key="cell" scrollable="YES" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" alignment="right" title="0" drawsBackground="YES" id="cell-xOffsetField"/>
+                    <rect key="frame" x="47" y="44" width="48" height="22"/>
+                    <textFieldCell key="cell" controlSize="small" scrollable="YES" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" alignment="right" title="0" drawsBackground="YES" id="cell-xOffsetField">
+                        <font key="font" metaFont="smallSystem"/>
+                    </textFieldCell>
                     <connections>
                         <action selector="handleSettingsAction:" target="-2" id="act-xoffset"/>
                     </connections>
                 </textField>
                 <textField id="labelYOffset" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="10" y="115" width="62" height="17"/>
-                    <textFieldCell key="cell" title="Y Offset" id="cell-labelYOffset"/>
+                    <rect key="frame" x="102" y="47" width="36" height="17"/>
+                    <textFieldCell key="cell" controlSize="small" title="Y Off" id="cell-labelYOffset">
+                        <font key="font" metaFont="smallSystem"/>
+                    </textFieldCell>
                 </textField>
                 <textField id="yOffsetField" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="82" y="112" width="86" height="22"/>
-                    <textFieldCell key="cell" scrollable="YES" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" alignment="right" title="0" drawsBackground="YES" id="cell-yOffsetField"/>
+                    <rect key="frame" x="141" y="44" width="48" height="22"/>
+                    <textFieldCell key="cell" controlSize="small" scrollable="YES" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" alignment="right" title="0" drawsBackground="YES" id="cell-yOffsetField">
+                        <font key="font" metaFont="smallSystem"/>
+                    </textFieldCell>
                     <connections>
                         <action selector="handleSettingsAction:" target="-2" id="act-yoffset"/>
                     </connections>
                 </textField>
                 <segmentedControl id="outputMode" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="10" y="81" width="158" height="24"/>
+                    <rect key="frame" x="202" y="43" width="120" height="24"/>
                     <segmentedCell key="cell" borderStyle="border" alignment="left" segmentDistribution="fillEqually" style="roundRect" trackingMode="selectOne" id="cell-outputMode">
+                        <font key="font" metaFont="smallSystem"/>
                         <segments>
                             <segment label="Filled" selected="YES"/>
                             <segment label="Line" tag="1"/>
@@ -113,55 +135,73 @@
                     </connections>
                 </segmentedControl>
                 <button id="showGrid" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="10" y="55" width="74" height="18"/>
-                    <buttonCell key="cell" type="check" title="Grid" bezelStyle="regularSquare" imagePosition="left" state="on" id="cell-showGrid"/>
+                    <rect key="frame" x="8" y="20" width="52" height="18"/>
+                    <buttonCell key="cell" controlSize="small" type="check" title="Grid" bezelStyle="regularSquare" imagePosition="left" state="on" id="cell-showGrid">
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
                     <connections>
                         <action selector="handleSettingsAction:" target="-2" id="act-grid"/>
                     </connections>
                 </button>
                 <button id="showNodes" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="92" y="55" width="76" height="18"/>
-                    <buttonCell key="cell" type="check" title="Nodes" bezelStyle="regularSquare" imagePosition="left" state="on" id="cell-showNodes"/>
+                    <rect key="frame" x="66" y="20" width="62" height="18"/>
+                    <buttonCell key="cell" controlSize="small" type="check" title="Nodes" bezelStyle="regularSquare" imagePosition="left" state="on" id="cell-showNodes">
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
                     <connections>
                         <action selector="handleSettingsAction:" target="-2" id="act-nodes"/>
                     </connections>
                 </button>
                 <button id="showCandidates" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="10" y="32" width="98" height="18"/>
-                    <buttonCell key="cell" type="check" title="Candidates" bezelStyle="regularSquare" imagePosition="left" state="on" id="cell-showCandidates"/>
+                    <rect key="frame" x="134" y="20" width="92" height="18"/>
+                    <buttonCell key="cell" controlSize="small" type="check" title="Candidates" bezelStyle="regularSquare" imagePosition="left" state="on" id="cell-showCandidates">
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
                     <connections>
                         <action selector="handleSettingsAction:" target="-2" id="act-candidates"/>
                     </connections>
                 </button>
                 <button id="showLabels" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="116" y="32" width="62" height="18"/>
-                    <buttonCell key="cell" type="check" title="Labels" bezelStyle="regularSquare" imagePosition="left" id="cell-showLabels"/>
+                    <rect key="frame" x="232" y="20" width="62" height="18"/>
+                    <buttonCell key="cell" controlSize="small" type="check" title="Labels" bezelStyle="regularSquare" imagePosition="left" id="cell-showLabels">
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
                     <connections>
                         <action selector="handleSettingsAction:" target="-2" id="act-labels"/>
                     </connections>
                 </button>
                 <button id="applyButton" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="10" y="4" width="50" height="22"/>
-                    <buttonCell key="cell" type="push" title="Apply" bezelStyle="rounded" alignment="center" id="cell-applyButton"/>
+                    <rect key="frame" x="8" y="0" width="50" height="22"/>
+                    <buttonCell key="cell" controlSize="small" type="push" title="Apply" bezelStyle="rounded" alignment="center" id="cell-applyButton">
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
                     <connections>
                         <action selector="applyAction:" target="-2" id="act-apply"/>
                     </connections>
                 </button>
                 <button id="undoButton" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="66" y="4" width="50" height="22"/>
-                    <buttonCell key="cell" type="push" title="Undo" bezelStyle="rounded" alignment="center" id="cell-undoButton"/>
+                    <rect key="frame" x="64" y="0" width="50" height="22"/>
+                    <buttonCell key="cell" controlSize="small" type="push" title="Undo" bezelStyle="rounded" alignment="center" id="cell-undoButton">
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
                     <connections>
                         <action selector="undoStepAction:" target="-2" id="act-undo"/>
                     </connections>
                 </button>
                 <button id="clearButton" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="122" y="4" width="46" height="22"/>
-                    <buttonCell key="cell" type="push" title="Clear" bezelStyle="rounded" alignment="center" id="cell-clearButton"/>
+                    <rect key="frame" x="120" y="0" width="50" height="22"/>
+                    <buttonCell key="cell" controlSize="small" type="push" title="Clear" bezelStyle="rounded" alignment="center" id="cell-clearButton">
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
                     <connections>
                         <action selector="clearAction:" target="-2" id="act-clear"/>
                     </connections>
                 </button>
             </subviews>
+            <constraints>
+                <constraint firstAttribute="width" constant="360" id="hof-width"/>
+                <constraint firstAttribute="height" constant="104" id="hof-height"/>
+            </constraints>
         </customView>
     </objects>
 </document>

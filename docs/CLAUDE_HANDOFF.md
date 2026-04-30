@@ -1,7 +1,7 @@
 # HofmannTool Handoff for Claude
 
-最終更新: 2026-04-30 (Bezier 円弧/Apply 実装後)
-作業ブランチ: `feature/bootstrap-scaffold`
+最終更新: 2026-04-30 (操作履歴/UI整理後)
+作業ブランチ: `feature/tool-history-ui`
 直前HEAD: `b444f64 fix: localize and restyle inspector controls`
 
 ## 目的
@@ -84,20 +84,24 @@ SDK:
 
 - Glyphs でツールとしてロードされる。
 - active layer の body box 中央に unit grid を描画する。
-- Inspector で `Rows`, `Cols`, `Spacing`, `Diameter`, `X`, `Y`, 表示トグルを設定できる。
+- Inspector で `Rows`, `Cols`, `Spacing`, `Diameter`, `X`, `Y`, 出力モードを設定できる。
+- グリッド、ノード、候補は常時表示。ラベル表示機能は削除済み。
 - 日本語環境ではラベルが日本語になる。
 - 各グリッド点に直径 `Diameter` の円を薄く描く。中心 dot は補助表示として残る。
 - 開始/アクティブノードは円が太線+色で強調される。
 - クリックで開始ノードを選び、次ノードクリックで接線候補を表示し、候補クリックで確定。
 - 候補プレビューは「直前 segment からの接続円弧 + 接線直線 + 閉じる場合は閉じ円弧」を表示。
 - 確定プレビューは「接線直線 + 各コーナー円弧」を表示。閉じた contour では closePath。
+- 選択済みルートは node/flow の履歴として保持し、`Diameter`, `Spacing`, offset 変更時に現在設定で接線を再計算する。
+- `Cmd+Z` / `Shift+Cmd+Z` でツール内の選択履歴を undo/redo できる。`Clear` も undo 対象。
 - `Apply`:
   - `Line` モード: open でも closed でも `GSPath` を生成して active layer に追加。closed contour でも `GSPath.closed=False` のままにし、塗り形状にはしない。
   - `Filled` モード: closed のときだけ `GSPath.closed=True` で追加、未 closed 時はコンソール警告。
   - 円弧は polyline ではなく、`GSNode(OFFCURVE)` + `GSNode(CURVE)` の cubic Bezier で近似。
   - Bezier の on-curve node は、円弧が 0/90/180/270 度の極点をまたぐ場合に必ずそこで分割する。
   - `layer.beginChanges()` / `endChanges()` を使って Glyphs の undo grouping に統合。
-- `Apply`, `Undo`, `Clear` は inspector 下段に標準サイズの押しボタンとして並ぶ。
+- `Apply` 後はツールの選択状態とツール内履歴をクリアする。
+- `Apply`, `Clear` は inspector 下段に標準サイズの押しボタンとして並ぶ。
 
 現在できない/不完全なこと:
 
@@ -115,6 +119,9 @@ SDK:
 - 「円弧作るの逆だと思う」 → 対応済 (flow ラベルの CW/CCW semantics を修正)。
 - 「トレースしてポイント作らないでちゃんとベジェ曲線で近似」 → 対応済 (polyline 書き出しを廃止し、cubic Bezier を出力)。
 - 「フォントという特性上極点にノードがあったほうがいい」 → 対応済 (0/90/180/270 度をまたぐ円弧は必ずそこで分割)。
+- 「グリッド/ノード/候補は常時表示、ラベル不要」 → 対応済 (表示チェックボックスとラベル描画を削除)。
+- 「半径変更時に既存分も追随」 → 対応済 (node/flow から接線を再計算)。
+- 「戻すボタンを排除して Cmd+Z / Shift+Cmd+Z」 → 対応済 (ツール内履歴 100 件)。
 - いったん Claude に投げられるよう、仕様書、参考コード、現状修正点をまとめたい → 本ドキュメント。
 
 ## 期待仕様
@@ -131,12 +138,12 @@ SDK:
 - `Diameter` / `直径`
 - `X`, `Y` offset
 - output mode: `Filled` / `塗り`, `Line` / `線`
-- visibility: `Grid` / `グリッド`, `Nodes` / `ノード`, `Candidates` / `候補`, `Labels` / `ラベル`
-- commands: `Apply` / `適用`, `Undo` / `戻す`, `Clear` / `消去`
+- commands: `Apply` / `適用`, `Clear` / `消去`
+- undo/redo: `Cmd+Z`, `Shift+Cmd+Z`
 
 UI改善希望:
 
-- `Apply`, `Undo`, `Clear` は明確に押せるボタンとして見えること。
+- `Apply`, `Clear` は明確に押せるボタンとして見えること。
 - 入力欄の文字は明確に見えること。
 - ラベルは白飛びしないこと。
 - 右側に不要な余白を作らないこと。
@@ -235,6 +242,8 @@ Undo integration:
 - `applyAction_` を実装。Line/Filled モードに対応し、円弧は `OFFCURVE`/`CURVE` ノードで出力。Line mode は closed contour でも `GSPath.closed=False`、Filled mode は closed contour のみ `True`。`layer.beginChanges()` で undo に統合。
 - Inspector 高さを `104` → `124` に拡張し、底部に 3 つの標準サイズ rounded push button を配置。
 - Apply/Undo/Clear のタイトル色オーバーライドを停止 (システム既定の bezel が活きるように)。
+- 表示チェックボックスと Undo ボタンを削除し、Inspector 高さを `96` に縮小。
+- ツール内履歴を追加し、`Cmd+Z` / `Shift+Cmd+Z` で選択、候補表示、候補確定、Clear を undo/redo 可能にした。
 
 ## 次に直すべき順番
 
@@ -252,6 +261,7 @@ Undo integration:
 7. Apply 時の Glyphs Undo メニュー名指定。
    - `layer.beginChanges()` 周りで `Glyphs.font.parent.windowController().undoManager()` を取得して
      `setActionName_("Apply Hofmann Tangents")` を呼べるか確認する。
+   - ただしツール内に undo 履歴があるときは `Cmd+Z` をツール側で消費する。Apply 後はツール履歴をクリアするため、Glyphs 側 undo に戻る想定。
 8. Geometry tests の追補。
    - flow 継続失敗時に候補が空になること。
    - Bezier 円弧が flow 方向どおりに進むこと (現テストで CCW/CW を確認済)。

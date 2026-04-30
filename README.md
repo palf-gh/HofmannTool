@@ -7,3 +7,5 @@ an inspector view, preview-grid drawing, and pure Python geometry foundations.
 Interactive path creation and Apply-to-layer output are planned for the MVP
 feature branch.
 
+See [docs/CLAUDE_HANDOFF.md](docs/CLAUDE_HANDOFF.md) for the current spec,
+reference code notes, known gaps, and next implementation tasks.

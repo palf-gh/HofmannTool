@@ -1,8 +1,8 @@
 # HofmannTool Handoff for Claude
 
-最終更新: 2026-04-30
+最終更新: 2026-04-30 (Bezier 円弧/Apply 実装後)
 作業ブランチ: `feature/bootstrap-scaffold`
-現HEAD: `b444f64 fix: localize and restyle inspector controls`
+直前HEAD: `b444f64 fix: localize and restyle inspector controls`
 
 ## 目的
 
@@ -72,6 +72,7 @@ SDK:
 - `HofmannTool.glyphsTool/Contents/Resources/hofmann_geometry.py`
   - Glyphs/AppKit 非依存の geometry module。
   - `Point`, `GridNode`, `TangentCandidate`, `grid_origin`, `node_point`, `create_tangent_candidates`, `is_closed_contour`。
+  - 円弧/Bezier: `candidate_radius`, `arc_to_bezier_segments`。
 - `HofmannTool.glyphsTool/Contents/Resources/InspectorView.xib`
   - 横長の Inspector UI。
 - `HofmannTool.glyphsTool/Contents/Resources/InspectorView.nib`
@@ -85,40 +86,42 @@ SDK:
 - active layer の body box 中央に unit grid を描画する。
 - Inspector で `Rows`, `Cols`, `Spacing`, `Diameter`, `X`, `Y`, 表示トグルを設定できる。
 - 日本語環境ではラベルが日本語になる。
-- クリックで開始ノードを選び、次ノードクリックで接線候補を表示し、候補クリックでプレビュー線を確定できる。
+- 各グリッド点に直径 `Diameter` の円を薄く描く。中心 dot は補助表示として残る。
+- 開始/アクティブノードは円が太線+色で強調される。
+- クリックで開始ノードを選び、次ノードクリックで接線候補を表示し、候補クリックで確定。
+- 候補プレビューは「直前 segment からの接続円弧 + 接線直線 + 閉じる場合は閉じ円弧」を表示。
+- 確定プレビューは「接線直線 + 各コーナー円弧」を表示。閉じた contour では closePath。
+- `Apply`:
+  - `Line` モード: open でも closed でも `GSPath` を生成して active layer に追加。closed contour でも `GSPath.closed=False` のままにし、塗り形状にはしない。
+  - `Filled` モード: closed のときだけ `GSPath.closed=True` で追加、未 closed 時はコンソール警告。
+  - 円弧は polyline ではなく、`GSNode(OFFCURVE)` + `GSNode(CURVE)` の cubic Bezier で近似。
+  - Bezier の on-curve node は、円弧が 0/90/180/270 度の極点をまたぐ場合に必ずそこで分割する。
+  - `layer.beginChanges()` / `endChanges()` を使って Glyphs の undo grouping に統合。
+- `Apply`, `Undo`, `Clear` は inspector 下段に標準サイズの押しボタンとして並ぶ。
 
 現在できない/不完全なこと:
 
-- `Diameter` の円が描画されていない。
-  - 現状はノード位置に小さい dot を描いているだけ。
-  - 正しくは各グリッド点に直径 `Diameter` の円を薄く描くべき。
-- 候補/確定プレビューが直線だけで、円弧がない。
-  - 正しくは接線直線 + 接続円上の arc を描く。
-- Apply は未実装。
-  - 現状は `print("HofmannTool: Apply will be implemented...")` だけ。
-  - 正しくは `GSPath` / `GSNode` を作って active layer に追加する。
-- `Filled Shape` / `Centerline` の出力差が未実装。
-  - `Centerline`: 開いた状態でも接線+円弧の中心線的アウトライン、または単線相当の open path。
-  - `Filled Shape`: 閉じた輪郭のみ有効にし、塗り形状として `GSPath.closed = True`。
-- UIの `Apply`, `Undo`, `Clear` がボタンに見えにくい。
-  - Glyphs inspector 上では small push button がフラットな文字に見える。
-  - より明確な segmented/push style、またはアイコン+短ラベルへの変更が必要。
+- 候補ホバー強調や、複数候補の見分けやすさ (色/dash) はまだ未調整。
+- `Apply` 時に Glyphs 側 Undo メニューに専用名 (例: "Apply Hofmann Tangents") は付いていない。
 
 ## ユーザーからの最新フィードバック
 
 2026-04-30:
 
-- 「直径サイズで円が描画されるべき」
-- 現在の接続線表示が変に見える。
-- `Apply` を押しても何も起きない。
-- `Apply`, `Undo`, `Clear` がボタンに見えない。
-- いったん Claude に投げられるよう、仕様書、参考コード、現状修正点をまとめたい。
+- 「直径サイズで円が描画されるべき」 → 対応済 (各ノードに `Diameter` 円を描画)。
+- 現在の接続線表示が変に見える → 対応済 (接線直線 + 円弧プレビュー)。
+- `Apply` を押しても何も起きない → 対応済 (`GSPath` を active layer に追加、Line/Filled mode 切替)。
+- `Apply`, `Undo`, `Clear` がボタンに見えない → 対応済 (標準サイズの rounded push button、底部に 3 等分配置)。
+- 「円弧作るの逆だと思う」 → 対応済 (flow ラベルの CW/CCW semantics を修正)。
+- 「トレースしてポイント作らないでちゃんとベジェ曲線で近似」 → 対応済 (polyline 書き出しを廃止し、cubic Bezier を出力)。
+- 「フォントという特性上極点にノードがあったほうがいい」 → 対応済 (0/90/180/270 度をまたぐ円弧は必ずそこで分割)。
+- いったん Claude に投げられるよう、仕様書、参考コード、現状修正点をまとめたい → 本ドキュメント。
 
 ## 期待仕様
 
 ### Inspector
 
-横長配置を維持する。現在の幅は `326`, 高さは `104`。
+横長配置を維持する。現在の幅は `326`, 高さは `124` (ボタン行を確保するため `104` から拡張)。
 
 操作項目:
 
@@ -223,26 +226,36 @@ Undo integration:
 - 入力欄の文字色を黒、背景を白に固定。
 - Inspector 幅を `360` から `326` に縮小。
 
+未コミットの作業 (本ハンドオフ後の修正):
+
+- geometry に `candidate_radius`, `arc_to_bezier_segments` を追加し、テストを 6 → 15 に増やす。
+- flow ラベルの CW/CCW semantics を修正し、接線点が実際の進行方向と一致するようにした。
+- plugin で各ノードに `Diameter` 円を描画。アクティブ/開始ノードは太線+色で強調。
+- 接線+Bezier 円弧プレビュー (候補/確定共通) を実装。
+- `applyAction_` を実装。Line/Filled モードに対応し、円弧は `OFFCURVE`/`CURVE` ノードで出力。Line mode は closed contour でも `GSPath.closed=False`、Filled mode は closed contour のみ `True`。`layer.beginChanges()` で undo に統合。
+- Inspector 高さを `104` → `124` に拡張し、底部に 3 つの標準サイズ rounded push button を配置。
+- Apply/Undo/Clear のタイトル色オーバーライドを停止 (システム既定の bezel が活きるように)。
+
 ## 次に直すべき順番
 
-1. 円表示を実装する。
-   - `Diameter` を使って全ノードに円を描く。
-   - 小さい center dot は補助表示として残してよい。
-2. 接線プレビューを直線 + 円弧にする。
-   - `TangentCandidate` は `point_a`, `point_b`, `center_a`, `center_b`, `angle_a`, `angle_b`, `flow_a`, `flow_b` を持っている。
-   - この情報から arc を描画する。
-3. `Apply` を実装する。
-   - まず `Line` mode で `GSPath` 追加。
-   - その後 `Filled` mode を closed contour 限定で実装。
-4. コマンドボタンを見た目上のボタンにする。
-   - XIB上の `NSButton` style を見直す。
-   - Glyphs inspector 上で flat text に見えるなら、3分割 segmented control にする案もあり。
-5. Geometry tests を増やす。
-   - 外接線/内接線の接点位置。
-   - flow継続。
-   - arc方向。
-   - diameter >= distance の候補除外。
-   - closed contour から path samples 生成。
+1. ~~円表示を実装する~~ → 完了。
+2. ~~接線プレビューを直線 + 円弧にする~~ → 完了 (描画/Apply 双方)。
+3. ~~`Apply` を実装する~~ → 完了 (Line / Filled mode 切替, undo grouping 込み)。
+4. ~~コマンドボタンを見た目上のボタンにする~~ → 完了 (rounded push button, 標準サイズ)。
+5. ~~円弧 → cubic bezier 近似で `GSPath` に書き出す~~ → 完了。
+   - `GSNode(OFFCURVE)` + `GSNode(CURVE)` で最大 90° ごとに分けて出力。
+   - 0/90/180/270 度の極点をまたぐ場合、必ずそこで on-curve node を置く。
+   - 制御点の長さは `radius * (4/3) * tan(theta/4)`。
+6. Inspector のホバー強調や候補の色分け。
+   - 4 候補のうちカーソルに最近いものを濃く描き、他を薄く描く。
+   - 内接線/外接線で dash パターンを変える案もあり。
+7. Apply 時の Glyphs Undo メニュー名指定。
+   - `layer.beginChanges()` 周りで `Glyphs.font.parent.windowController().undoManager()` を取得して
+     `setActionName_("Apply Hofmann Tangents")` を呼べるか確認する。
+8. Geometry tests の追補。
+   - flow 継続失敗時に候補が空になること。
+   - Bezier 円弧が flow 方向どおりに進むこと (現テストで CCW/CW を確認済)。
+   - closed contour の最終円弧が Glyphs 上で期待どおり閉じることの手動確認。
 
 ## 開発/検証コマンド
 
@@ -274,10 +287,10 @@ Glyphs はプラグイン変更後に再起動する。
 この repo は Glyphs 3 用 SelectTool の HofmannTool です。
 docs/CLAUDE_HANDOFF.md を読んで、まず以下を直してください。
 
-1. Diameter の円を各グリッド点に描画する
-2. 候補/確定プレビューを接線直線 + 円弧表示にする
-3. Apply を Line mode から実装して active layer に GSPath を追加する
-4. Apply/Undo/Clear が Glyphs inspector 上でボタンに見えるよう UI を調整する
+1. Glyphs 上で closed contour の Apply 結果を確認し、閉じ円弧の node type が崩れる場合は修正する
+2. 候補ホバー強調や候補ごとの見分けやすさを改善する
+3. Apply 時の Glyphs Undo メニュー名を付けられるか確認する
+4. flow 継続失敗時や無効直径のテストを追加する
 
 Web版 hofmann-1.0.0 のコードはコピーせず、挙動の参考に留めてください。
 検証は py_compile, unittest, ibtool compile を通してください。

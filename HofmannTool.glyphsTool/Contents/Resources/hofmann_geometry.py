@@ -84,7 +84,11 @@ def _perpendicular(unit):
 
 
 def _flow_sign(flow):
-    return 1.0 if flow == FLOW_CCW else -1.0
+    # Outer-tangent offset is placed so that travelling along the tangent in the
+    # A->B direction matches the named rotation around each circle. With unit Y-up
+    # geometry, CCW rotation needs the tangent point on the right of A->B (i.e.
+    # opposite of `perp` which is +90 degree rotation of `unit`), and CW on the left.
+    return -1.0 if flow == FLOW_CCW else 1.0
 
 
 def _angle(center, point):
@@ -152,3 +156,84 @@ def is_closed_contour(candidates):
         if previous.node_b != current.node_a:
             return False
     return candidates[0].node_a == candidates[-1].node_b
+
+
+def candidate_radius(candidate):
+    return candidate.point_a.sub(candidate.center_a).length()
+
+
+def _resolve_arc_end_angle(start_angle_deg, end_angle_deg, flow):
+    start = float(start_angle_deg)
+    end = float(end_angle_deg)
+    if flow == FLOW_CCW:
+        while end < start:
+            end += 360.0
+        while end - start > 360.0:
+            end -= 360.0
+    else:
+        while end > start:
+            end -= 360.0
+        while start - end > 360.0:
+            end += 360.0
+    return end
+
+
+def _arc_break_angles(start_angle_deg, end_angle_deg, flow, max_arc_deg=90.0):
+    start = float(start_angle_deg)
+    end = _resolve_arc_end_angle(start, float(end_angle_deg), flow)
+    if abs(end - start) < 1e-9:
+        return []
+
+    max_arc = max(1e-6, abs(float(max_arc_deg)))
+    lower = min(start, end)
+    upper = max(start, end)
+    first_k = int(math.floor(lower / 90.0)) - 1
+    last_k = int(math.ceil(upper / 90.0)) + 1
+    extrema = []
+    for k in range(first_k, last_k + 1):
+        angle = k * 90.0
+        if flow == FLOW_CCW:
+            if start + 1e-9 < angle < end - 1e-9:
+                extrema.append(angle)
+        else:
+            if end + 1e-9 < angle < start - 1e-9:
+                extrema.append(angle)
+    extrema.sort(reverse=(flow == FLOW_CW))
+
+    raw_breaks = [start] + extrema + [end]
+    breaks = [start]
+    for raw_start, raw_end in zip(raw_breaks, raw_breaks[1:]):
+        sweep = raw_end - raw_start
+        n_steps = max(1, int(math.ceil(abs(sweep) / max_arc)))
+        for i in range(1, n_steps + 1):
+            breaks.append(raw_start + sweep * (i / float(n_steps)))
+    return breaks
+
+
+def arc_to_bezier_segments(center, radius, start_angle_deg, end_angle_deg, flow, max_arc_deg=90.0):
+    # Cubic Bezier approximation of a circular arc. Default splitting keeps
+    # on-curve points at font-friendly extrema (0/90/180/270 degrees) and never
+    # sweeps more than `max_arc_deg` per cubic segment.
+    break_angles = _arc_break_angles(start_angle_deg, end_angle_deg, flow, max_arc_deg=max_arc_deg)
+    if not break_angles:
+        return []
+    cx = float(center.x)
+    cy = float(center.y)
+    r = float(radius)
+    segments = []
+    for start_angle, end_angle in zip(break_angles, break_angles[1:]):
+        a0 = math.radians(start_angle)
+        a1 = math.radians(end_angle)
+        delta = a1 - a0
+        # k is signed; tan(delta/4) flips when sweeping CW so handles point the right way.
+        k = (4.0 / 3.0) * math.tan(delta / 4.0) * r
+        p0 = Point(cx + r * math.cos(a0), cy + r * math.sin(a0))
+        p3 = Point(cx + r * math.cos(a1), cy + r * math.sin(a1))
+        t0x = -math.sin(a0)
+        t0y = math.cos(a0)
+        t1x = -math.sin(a1)
+        t1y = math.cos(a1)
+        p1 = Point(p0.x + k * t0x, p0.y + k * t0y)
+        p2 = Point(p3.x - k * t1x, p3.y - k * t1y)
+        segments.append((p0, p1, p2, p3))
+    return segments

@@ -79,6 +79,12 @@ class HofmannTool(SelectTool):
     diameterTextField = objc.IBOutlet()
     xOffsetTextField = objc.IBOutlet()
     yOffsetTextField = objc.IBOutlet()
+    rowsStepper = objc.IBOutlet()
+    colsStepper = objc.IBOutlet()
+    spacingStepper = objc.IBOutlet()
+    diameterStepper = objc.IBOutlet()
+    xOffsetStepper = objc.IBOutlet()
+    yOffsetStepper = objc.IBOutlet()
     outputModeSegmentedControl = objc.IBOutlet()
     applyButton = objc.IBOutlet()
     clearButton = objc.IBOutlet()
@@ -208,6 +214,7 @@ class HofmannTool(SelectTool):
         self._set_field_value(self.diameterTextField, s["diameter"])
         self._set_field_value(self.xOffsetTextField, s["xOffset"])
         self._set_field_value(self.yOffsetTextField, s["yOffset"])
+        self._sync_steppers_to_settings(s)
         if self.outputModeSegmentedControl:
             mode_to_segment = {"filled": 0, "hole": 1, "centerline": 2}
             self.outputModeSegmentedControl.setSelectedSegment_(mode_to_segment.get(s["outputMode"], 0))
@@ -233,7 +240,22 @@ class HofmannTool(SelectTool):
         d[PREF + ".xOffset"] = s["xOffset"]
         d[PREF + ".yOffset"] = s["yOffset"]
         d[PREF + ".outputMode"] = s["outputMode"]
+        self._sync_steppers_to_settings(s)
         return s
+
+    @objc.python_method
+    def _sync_steppers_to_settings(self, s):
+        pairs = (
+            (self.rowsStepper, s["rows"]),
+            (self.colsStepper, s["cols"]),
+            (self.spacingStepper, s["spacing"]),
+            (self.diameterStepper, s["diameter"]),
+            (self.xOffsetStepper, s["xOffset"]),
+            (self.yOffsetStepper, s["yOffset"]),
+        )
+        for stepper, value in pairs:
+            if stepper is not None:
+                stepper.setDoubleValue_(float(value))
 
     @objc.python_method
     def _set_field_value(self, field, value):
@@ -571,7 +593,10 @@ class HofmannTool(SelectTool):
         if modifiers & NSEventModifierFlagCommand:
             node = self._nearest_node(layer, point, s)
             if node is not None:
-                self._spawn_single_circle(layer, node, s)
+                hole = (s["outputMode"] == "hole")
+                if modifiers & NSEventModifierFlagShift:
+                    hole = not hole
+                self._spawn_single_circle(layer, node, s, hole=hole)
                 Glyphs.redraw()
                 return
         if self._candidate_segments:
@@ -871,6 +896,37 @@ class HofmannTool(SelectTool):
             )
 
     @objc.IBAction
+    def stepperAction_(self, sender):
+        if sender is None:
+            return
+        try:
+            value = float(sender.doubleValue())
+        except Exception:
+            return
+        mapping = (
+            (self.rowsStepper, self.rowsTextField, True),
+            (self.colsStepper, self.colsTextField, True),
+            (self.spacingStepper, self.spacingTextField, False),
+            (self.diameterStepper, self.diameterTextField, False),
+            (self.xOffsetStepper, self.xOffsetTextField, False),
+            (self.yOffsetStepper, self.yOffsetTextField, False),
+        )
+        target_field = None
+        is_int = False
+        for stepper, field, int_flag in mapping:
+            if stepper is sender:
+                target_field = field
+                is_int = int_flag
+                break
+        if target_field is None:
+            return
+        if is_int:
+            target_field.setStringValue_(str(int(value)))
+        else:
+            target_field.setStringValue_("%g" % value)
+        self.handleSettingsAction_(sender)
+
+    @objc.IBAction
     def handleSettingsAction_(self, sender):
         s = self._save_settings_from_ui()
         layer = self._current_layer()
@@ -914,11 +970,11 @@ class HofmannTool(SelectTool):
         Glyphs.redraw()
 
     @objc.python_method
-    def _spawn_single_circle(self, layer, node, s):
+    def _spawn_single_circle(self, layer, node, s, hole=False):
         point_map = self._grid_point_map(layer, s)
         if node not in point_map:
             return
-        flow = FLOW_CW if s["outputMode"] == "hole" else FLOW_CCW
+        flow = FLOW_CW if hole else FLOW_CCW
         path = self._build_single_circle_gs_path(point_map[node], s["diameter"], flow=flow)
         if path is None:
             return

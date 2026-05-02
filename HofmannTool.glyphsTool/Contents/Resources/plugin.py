@@ -593,10 +593,7 @@ class HofmannTool(SelectTool):
         if modifiers & NSEventModifierFlagCommand:
             node = self._nearest_node(layer, point, s)
             if node is not None:
-                hole = (s["outputMode"] == "hole")
-                if modifiers & NSEventModifierFlagShift:
-                    hole = not hole
-                self._spawn_single_circle(layer, node, s, hole=hole)
+                self._spawn_single_circle(layer, node, s, hole=(s["outputMode"] == "hole"))
                 Glyphs.redraw()
                 return
         if self._candidate_segments:
@@ -974,8 +971,7 @@ class HofmannTool(SelectTool):
         point_map = self._grid_point_map(layer, s)
         if node not in point_map:
             return
-        flow = FLOW_CW if hole else FLOW_CCW
-        path = self._build_single_circle_gs_path(point_map[node], s["diameter"], flow=flow)
+        path = self._build_single_circle_gs_path(point_map[node], s["diameter"], hole=hole)
         if path is None:
             return
         self._append_path_to_layer(layer, path)
@@ -1031,11 +1027,11 @@ class HofmannTool(SelectTool):
         path.nodes = new_nodes
 
     @objc.python_method
-    def _build_single_circle_gs_path(self, center, diameter, flow=FLOW_CCW):
+    def _build_single_circle_gs_path(self, center, diameter, hole=False):
         radius = float(diameter) * 0.5
         if radius <= 0.0:
             return None
-        bez_segments = arc_to_bezier_segments(center, radius, 0.0, 360.0, flow)
+        bez_segments = arc_to_bezier_segments(center, radius, 0.0, 360.0, FLOW_CCW)
         if not bez_segments:
             return None
         path = GSPath()
@@ -1048,6 +1044,8 @@ class HofmannTool(SelectTool):
             if index < last_index:
                 path.nodes.append(GSNode((float(p3.x), float(p3.y)), CURVE))
         path.closed = True
+        if hole:
+            self._reverse_gs_path(path)
         return path
 
     @objc.python_method

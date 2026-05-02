@@ -29,6 +29,8 @@ if RESOURCE_DIR not in sys.path:
 from hofmann_geometry import GridNode, grid_origin, node_point
 from hofmann_geometry import Point, create_tangent_candidate, create_tangent_candidates, is_closed_contour
 from hofmann_geometry import (
+    FLOW_CCW,
+    FLOW_CW,
     arc_to_bezier_segments,
     candidate_radius,
 )
@@ -559,6 +561,16 @@ class HofmannTool(SelectTool):
         s = self._save_settings_from_ui()
         self._refresh_geometry_from_settings(layer, s)
         point = Point(float(loc.x), float(loc.y))
+        try:
+            modifiers = event.modifierFlags()
+        except Exception:
+            modifiers = 0
+        if modifiers & NSEventModifierFlagCommand:
+            node = self._nearest_node(layer, point, s)
+            if node is not None:
+                self._spawn_single_circle(layer, node, s)
+                Glyphs.redraw()
+                return
         if self._candidate_segments:
             candidate = self._nearest_candidate(point, s)
             if candidate is not None:
@@ -893,6 +905,36 @@ class HofmannTool(SelectTool):
         self._reset_interaction_state()
         self._sync_edit_undo_menu_override()
         Glyphs.redraw()
+
+    @objc.python_method
+    def _spawn_single_circle(self, layer, node, s):
+        point_map = self._grid_point_map(layer, s)
+        if node not in point_map:
+            return
+        path = self._build_single_circle_gs_path(point_map[node], s["diameter"])
+        if path is None:
+            return
+        self._append_path_to_layer(layer, path)
+
+    @objc.python_method
+    def _build_single_circle_gs_path(self, center, diameter, flow=FLOW_CCW):
+        radius = float(diameter) * 0.5
+        if radius <= 0.0:
+            return None
+        bez_segments = arc_to_bezier_segments(center, radius, 0.0, 360.0, flow)
+        if not bez_segments:
+            return None
+        path = GSPath()
+        first_p0 = bez_segments[0][0]
+        path.nodes.append(GSNode((float(first_p0.x), float(first_p0.y)), CURVE))
+        last_index = len(bez_segments) - 1
+        for index, (_p0, p1, p2, p3) in enumerate(bez_segments):
+            path.nodes.append(GSNode((float(p1.x), float(p1.y)), OFFCURVE))
+            path.nodes.append(GSNode((float(p2.x), float(p2.y)), OFFCURVE))
+            if index < last_index:
+                path.nodes.append(GSNode((float(p3.x), float(p3.y)), CURVE))
+        path.closed = True
+        return path
 
     @objc.python_method
     def _current_layer(self):

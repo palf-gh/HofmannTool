@@ -571,7 +571,10 @@ class HofmannTool(SelectTool):
         if modifiers & NSEventModifierFlagCommand:
             node = self._nearest_node(layer, point, s)
             if node is not None:
-                self._spawn_single_circle(layer, node, s)
+                hole = (s["outputMode"] == "hole")
+                if modifiers & NSEventModifierFlagShift:
+                    hole = not hole
+                self._spawn_single_circle(layer, node, s, hole=hole)
                 Glyphs.redraw()
                 return
         if self._candidate_segments:
@@ -914,11 +917,11 @@ class HofmannTool(SelectTool):
         Glyphs.redraw()
 
     @objc.python_method
-    def _spawn_single_circle(self, layer, node, s):
+    def _spawn_single_circle(self, layer, node, s, hole=False):
         point_map = self._grid_point_map(layer, s)
         if node not in point_map:
             return
-        flow = FLOW_CW if s["outputMode"] == "hole" else FLOW_CCW
+        flow = FLOW_CW if hole else FLOW_CCW
         path = self._build_single_circle_gs_path(point_map[node], s["diameter"], flow=flow)
         if path is None:
             return

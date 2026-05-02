@@ -142,7 +142,8 @@ class HofmannTool(SelectTool):
         self._set_button_title(self.clearButton, {"en": "Clear", "ja": "消去"})
         if self.outputModeSegmentedControl is not None:
             self.outputModeSegmentedControl.setLabel_forSegment_(Glyphs.localize({"en": "Filled", "ja": "塗り"}), 0)
-            self.outputModeSegmentedControl.setLabel_forSegment_(Glyphs.localize({"en": "Line", "ja": "線"}), 1)
+            self.outputModeSegmentedControl.setLabel_forSegment_(Glyphs.localize({"en": "Hole", "ja": "穴"}), 1)
+            self.outputModeSegmentedControl.setLabel_forSegment_(Glyphs.localize({"en": "Line", "ja": "線"}), 2)
 
     @objc.python_method
     def _set_label(self, label, localized):
@@ -194,7 +195,7 @@ class HofmannTool(SelectTool):
         s["xOffset"] = _float_default("xOffset", s["xOffset"])
         s["yOffset"] = _float_default("yOffset", s["yOffset"])
         s["outputMode"] = Glyphs.defaults.get(PREF + ".outputMode", s["outputMode"])
-        if s["outputMode"] not in ("filled", "centerline"):
+        if s["outputMode"] not in ("filled", "hole", "centerline"):
             s["outputMode"] = "filled"
         return s
 
@@ -208,7 +209,8 @@ class HofmannTool(SelectTool):
         self._set_field_value(self.xOffsetTextField, s["xOffset"])
         self._set_field_value(self.yOffsetTextField, s["yOffset"])
         if self.outputModeSegmentedControl:
-            self.outputModeSegmentedControl.setSelectedSegment_(1 if s["outputMode"] == "centerline" else 0)
+            mode_to_segment = {"filled": 0, "hole": 1, "centerline": 2}
+            self.outputModeSegmentedControl.setSelectedSegment_(mode_to_segment.get(s["outputMode"], 0))
 
     @objc.python_method
     def _save_settings_from_ui(self):
@@ -219,8 +221,9 @@ class HofmannTool(SelectTool):
         s["diameter"] = max(1.0, self._read_float(self.diameterTextField, s["diameter"]))
         s["xOffset"] = self._read_float(self.xOffsetTextField, s["xOffset"])
         s["yOffset"] = self._read_float(self.yOffsetTextField, s["yOffset"])
-        if self.outputModeSegmentedControl and self.outputModeSegmentedControl.selectedSegment() == 1:
-            s["outputMode"] = "centerline"
+        if self.outputModeSegmentedControl:
+            segment_to_mode = {0: "filled", 1: "hole", 2: "centerline"}
+            s["outputMode"] = segment_to_mode.get(self.outputModeSegmentedControl.selectedSegment(), "filled")
 
         d = Glyphs.defaults
         d[PREF + ".rows"] = s["rows"]
@@ -889,16 +892,20 @@ class HofmannTool(SelectTool):
         if len(self._preview_segments) != len(self._route_steps):
             print("HofmannTool: current diameter/spacing makes part of the route invalid.")
             return
-        if s["outputMode"] == "filled" and not self._closed:
-            print("HofmannTool: Filled mode requires a closed contour. Close the loop or switch to Line mode.")
+        is_solid_mode = s["outputMode"] in ("filled", "hole")
+        if is_solid_mode and not self._closed:
+            mode_label = "Filled" if s["outputMode"] == "filled" else "Hole"
+            print("HofmannTool: %s mode requires a closed contour. Close the loop or switch to Line mode." % mode_label)
             return
         path = self._build_gs_path_from_segments(
             self._preview_segments,
             include_closing_arc=self._closed,
-            path_closed=(self._closed and s["outputMode"] == "filled"),
+            path_closed=(self._closed and is_solid_mode),
         )
         if path is None:
             return
+        if s["outputMode"] == "hole":
+            self._reverse_gs_path(path)
         self._append_path_to_layer(layer, path)
         self._undo_stack = []
         self._redo_stack = []
@@ -911,10 +918,61 @@ class HofmannTool(SelectTool):
         point_map = self._grid_point_map(layer, s)
         if node not in point_map:
             return
-        path = self._build_single_circle_gs_path(point_map[node], s["diameter"])
+        flow = FLOW_CW if s["outputMode"] == "hole" else FLOW_CCW
+        path = self._build_single_circle_gs_path(point_map[node], s["diameter"], flow=flow)
         if path is None:
             return
         self._append_path_to_layer(layer, path)
+
+    @objc.python_method
+    def _reverse_gs_path(self, path):
+        if path is None:
+            return
+        try:
+            reverse = getattr(path, "reverse", None)
+            if callable(reverse):
+                reverse()
+                return
+        except Exception:
+            pass
+        self._reverse_gs_path_manual(path)
+
+    @objc.python_method
+    def _reverse_gs_path_manual(self, path):
+        nodes = list(path.nodes)
+        if not nodes:
+            return
+        positions = [(float(n.position.x), float(n.position.y)) for n in nodes]
+        types = [n.type for n in nodes]
+        on_indices = [i for i, t in enumerate(types) if t != OFFCURVE]
+        if not on_indices:
+            return
+        rotated_positions = positions[on_indices[0]:] + positions[:on_indices[0]]
+        rotated_types = types[on_indices[0]:] + types[:on_indices[0]]
+        new_positions = [rotated_positions[0]]
+        new_types = [rotated_types[0]]
+        index = len(rotated_positions) - 1
+        while index > 0:
+            current_type = rotated_types[index]
+            if current_type == OFFCURVE:
+                if index >= 2 and rotated_types[index - 1] == OFFCURVE:
+                    new_positions.append(rotated_positions[index - 1])
+                    new_types.append(OFFCURVE)
+                    new_positions.append(rotated_positions[index])
+                    new_types.append(OFFCURVE)
+                    index -= 2
+                    continue
+                new_positions.append(rotated_positions[index])
+                new_types.append(OFFCURVE)
+                index -= 1
+                continue
+            new_positions.append(rotated_positions[index])
+            new_types.append(current_type)
+            index -= 1
+        new_nodes = []
+        for (px, py), tp in zip(new_positions, new_types):
+            new_nodes.append(GSNode((px, py), tp))
+        path.nodes = new_nodes
 
     @objc.python_method
     def _build_single_circle_gs_path(self, center, diameter, flow=FLOW_CCW):

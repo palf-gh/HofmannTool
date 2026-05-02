@@ -123,12 +123,13 @@
                     </connections>
                 </textField>
                 <segmentedControl id="outputMode" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="180" y="35" width="140" height="24"/>
+                    <rect key="frame" x="160" y="35" width="160" height="24"/>
                     <segmentedCell key="cell" borderStyle="border" alignment="left" segmentDistribution="fillEqually" style="roundRect" trackingMode="selectOne" id="cell-outputMode">
                         <font key="font" metaFont="smallSystem"/>
                         <segments>
                             <segment label="Filled" selected="YES"/>
-                            <segment label="Line" tag="1"/>
+                            <segment label="Hole" tag="1"/>
+                            <segment label="Line" tag="2"/>
                         </segments>
                     </segmentedCell>
                     <connections>

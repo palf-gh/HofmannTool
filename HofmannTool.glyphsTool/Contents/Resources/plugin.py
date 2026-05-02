@@ -129,7 +129,7 @@ class HofmannTool(SelectTool):
         return {
             "rows": 4,
             "cols": 4,
-            "spacing": 120.0,
+            "spacing": 40.0,
             "diameter": 80.0,
             "xOffset": 0.0,
             "yOffset": 0.0,
@@ -196,7 +196,7 @@ class HofmannTool(SelectTool):
         s = self._default_settings()
         s["rows"] = max(1, _int_default("rows", s["rows"]))
         s["cols"] = max(1, _int_default("cols", s["cols"]))
-        s["spacing"] = max(1.0, _float_default("spacing", s["spacing"]))
+        s["spacing"] = max(0.0, _float_default("spacing", s["spacing"]))
         s["diameter"] = max(1.0, _float_default("diameter", s["diameter"]))
         s["xOffset"] = _float_default("xOffset", s["xOffset"])
         s["yOffset"] = _float_default("yOffset", s["yOffset"])
@@ -224,7 +224,7 @@ class HofmannTool(SelectTool):
         s = self._default_settings()
         s["rows"] = max(1, self._read_int(self.rowsTextField, s["rows"]))
         s["cols"] = max(1, self._read_int(self.colsTextField, s["cols"]))
-        s["spacing"] = max(1.0, self._read_float(self.spacingTextField, s["spacing"]))
+        s["spacing"] = max(0.0, self._read_float(self.spacingTextField, s["spacing"]))
         s["diameter"] = max(1.0, self._read_float(self.diameterTextField, s["diameter"]))
         s["xOffset"] = self._read_float(self.xOffsetTextField, s["xOffset"])
         s["yOffset"] = self._read_float(self.yOffsetTextField, s["yOffset"])
@@ -287,15 +287,20 @@ class HofmannTool(SelectTool):
         return float(master.ascender), float(master.descender)
 
     @objc.python_method
+    def _grid_step(self, s):
+        return float(s["diameter"]) + float(s["spacing"])
+
+    @objc.python_method
     def _grid_points(self, layer, s):
         ascender, descender = self._layer_metrics(layer)
+        step = self._grid_step(s)
         origin = grid_origin(
             float(layer.width),
             ascender,
             descender,
             s["rows"],
             s["cols"],
-            s["spacing"],
+            step,
             s["xOffset"],
             s["yOffset"],
         )
@@ -303,7 +308,7 @@ class HofmannTool(SelectTool):
         for row in range(s["rows"]):
             for col in range(s["cols"]):
                 node = GridNode(row, col)
-                points.append((node, node_point(origin, node, s["spacing"])))
+                points.append((node, node_point(origin, node, step)))
         return origin, points
 
     @objc.python_method
@@ -593,10 +598,7 @@ class HofmannTool(SelectTool):
         if modifiers & NSEventModifierFlagCommand:
             node = self._nearest_node(layer, point, s)
             if node is not None:
-                hole = (s["outputMode"] == "hole")
-                if modifiers & NSEventModifierFlagShift:
-                    hole = not hole
-                self._spawn_single_circle(layer, node, s, hole=hole)
+                self._spawn_single_circle(layer, node, s, hole=(s["outputMode"] == "hole"))
                 Glyphs.redraw()
                 return
         if self._candidate_segments:
@@ -687,7 +689,8 @@ class HofmannTool(SelectTool):
             scale = self.editViewController().graphicView().scale()
         except Exception:
             scale = 1.0
-        threshold = max(8.0 / scale if scale else 8.0, min(s["spacing"] * 0.22, s["diameter"] * 0.35))
+        step = self._grid_step(s)
+        threshold = max(8.0 / scale if scale else 8.0, min(step * 0.22, s["diameter"] * 0.35))
         nearest = None
         nearest_distance = None
         for node, center in self._grid_points(layer, s)[1]:
@@ -699,7 +702,7 @@ class HofmannTool(SelectTool):
 
     @objc.python_method
     def _nearest_candidate(self, point, s):
-        threshold = max(5.0, min(s["spacing"] * 0.12, 12.0))
+        threshold = max(5.0, min(self._grid_step(s) * 0.12, 12.0))
         nearest = None
         nearest_distance = None
         for candidate in self._candidate_segments:
@@ -974,8 +977,7 @@ class HofmannTool(SelectTool):
         point_map = self._grid_point_map(layer, s)
         if node not in point_map:
             return
-        flow = FLOW_CW if hole else FLOW_CCW
-        path = self._build_single_circle_gs_path(point_map[node], s["diameter"], flow=flow)
+        path = self._build_single_circle_gs_path(point_map[node], s["diameter"], hole=hole)
         if path is None:
             return
         self._append_path_to_layer(layer, path)
@@ -1031,11 +1033,11 @@ class HofmannTool(SelectTool):
         path.nodes = new_nodes
 
     @objc.python_method
-    def _build_single_circle_gs_path(self, center, diameter, flow=FLOW_CCW):
+    def _build_single_circle_gs_path(self, center, diameter, hole=False):
         radius = float(diameter) * 0.5
         if radius <= 0.0:
             return None
-        bez_segments = arc_to_bezier_segments(center, radius, 0.0, 360.0, flow)
+        bez_segments = arc_to_bezier_segments(center, radius, 0.0, 360.0, FLOW_CCW)
         if not bez_segments:
             return None
         path = GSPath()
@@ -1048,6 +1050,8 @@ class HofmannTool(SelectTool):
             if index < last_index:
                 path.nodes.append(GSNode((float(p3.x), float(p3.y)), CURVE))
         path.closed = True
+        if hole:
+            self._reverse_gs_path(path)
         return path
 
     @objc.python_method

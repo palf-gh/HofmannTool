@@ -90,7 +90,7 @@
                 </textField>
                 <textField id="spacingField" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
                     <rect key="frame" x="180" y="65" width="37" height="22"/>
-                    <textFieldCell key="cell" controlSize="small" scrollable="YES" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" alignment="right" title="120" drawsBackground="YES" id="cell-spacingField">
+                    <textFieldCell key="cell" controlSize="small" scrollable="YES" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" alignment="right" title="40" drawsBackground="YES" id="cell-spacingField">
                         <font key="font" metaFont="smallSystem"/>
                     </textFieldCell>
                     <connections>
@@ -99,7 +99,7 @@
                 </textField>
                 <stepper id="spacingStepper" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
                     <rect key="frame" x="217" y="65" width="19" height="22"/>
-                    <stepperCell key="cell" controlSize="small" continuous="YES" alignment="left" minValue="1" maxValue="5000" doubleValue="120" increment="10" id="cell-spacingStepper"/>
+                    <stepperCell key="cell" controlSize="small" continuous="YES" alignment="left" minValue="0" maxValue="5000" doubleValue="40" increment="10" id="cell-spacingStepper"/>
                     <connections>
                         <action selector="stepperAction:" target="-2" id="act-spacing-stepper"/>
                     </connections>

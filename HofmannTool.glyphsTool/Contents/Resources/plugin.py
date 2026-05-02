@@ -35,6 +35,14 @@ from hofmann_geometry import (
     candidate_radius,
 )
 
+try:
+    from GlyphsApp import SMOOTH
+except ImportError:
+    try:
+        from GlyphsApp import GSSMOOTH as SMOOTH
+    except ImportError:
+        SMOOTH = 100
+
 
 PREF = "com.palf.HofmannTool"
 MAX_HISTORY = 100
@@ -1002,13 +1010,16 @@ class HofmannTool(SelectTool):
             return
         positions = [(float(n.position.x), float(n.position.y)) for n in nodes]
         types = [n.type for n in nodes]
+        connections = [getattr(n, "connection", None) for n in nodes]
         on_indices = [i for i, t in enumerate(types) if t != OFFCURVE]
         if not on_indices:
             return
         rotated_positions = positions[on_indices[0]:] + positions[:on_indices[0]]
         rotated_types = types[on_indices[0]:] + types[:on_indices[0]]
+        rotated_connections = connections[on_indices[0]:] + connections[:on_indices[0]]
         new_positions = [rotated_positions[0]]
         new_types = [rotated_types[0]]
+        new_connections = [rotated_connections[0]]
         index = len(rotated_positions) - 1
         while index > 0:
             current_type = rotated_types[index]
@@ -1016,42 +1027,87 @@ class HofmannTool(SelectTool):
                 if index >= 2 and rotated_types[index - 1] == OFFCURVE:
                     new_positions.append(rotated_positions[index - 1])
                     new_types.append(OFFCURVE)
+                    new_connections.append(rotated_connections[index - 1])
                     new_positions.append(rotated_positions[index])
                     new_types.append(OFFCURVE)
+                    new_connections.append(rotated_connections[index])
                     index -= 2
                     continue
                 new_positions.append(rotated_positions[index])
                 new_types.append(OFFCURVE)
+                new_connections.append(rotated_connections[index])
                 index -= 1
                 continue
             new_positions.append(rotated_positions[index])
             new_types.append(current_type)
+            new_connections.append(rotated_connections[index])
             index -= 1
         new_nodes = []
-        for (px, py), tp in zip(new_positions, new_types):
-            new_nodes.append(GSNode((px, py), tp))
+        for (px, py), tp, connection in zip(new_positions, new_types, new_connections):
+            new_nodes.append(self._make_gs_node((px, py), tp, connection=connection))
         path.nodes = new_nodes
+
+    @objc.python_method
+    def _make_gs_node(self, point, node_type, smooth=False, connection=None):
+        try:
+            x = point.x
+            y = point.y
+        except AttributeError:
+            x, y = point
+        node = GSNode((float(x), float(y)), type=node_type)
+        if connection is not None:
+            try:
+                node.connection = connection
+            except Exception:
+                pass
+        elif smooth:
+            try:
+                node.connection = SMOOTH
+            except Exception:
+                pass
+        return node
+
+    @objc.python_method
+    def _make_node_first(self, path, node):
+        if path is None or node is None:
+            return
+        try:
+            path.makeNodeFirst_(node)
+            return
+        except Exception:
+            pass
+        try:
+            node.makeNodeFirst()
+            return
+        except Exception:
+            pass
+        try:
+            nodes = list(path.nodes)
+            index = nodes.index(node)
+            path.nodes = nodes[index:] + nodes[:index]
+        except Exception:
+            pass
 
     @objc.python_method
     def _build_single_circle_gs_path(self, center, diameter, hole=False):
         radius = float(diameter) * 0.5
         if radius <= 0.0:
             return None
-        bez_segments = arc_to_bezier_segments(center, radius, 0.0, 360.0, FLOW_CCW)
+        if hole:
+            bez_segments = arc_to_bezier_segments(center, radius, 0.0, 360.0, FLOW_CCW)
+        else:
+            bez_segments = arc_to_bezier_segments(center, radius, 360.0, 0.0, FLOW_CW)
         if not bez_segments:
             return None
         path = GSPath()
-        first_p0 = bez_segments[0][0]
-        path.nodes.append(GSNode((float(first_p0.x), float(first_p0.y)), CURVE))
-        last_index = len(bez_segments) - 1
-        for index, (_p0, p1, p2, p3) in enumerate(bez_segments):
-            path.nodes.append(GSNode((float(p1.x), float(p1.y)), OFFCURVE))
-            path.nodes.append(GSNode((float(p2.x), float(p2.y)), OFFCURVE))
-            if index < last_index:
-                path.nodes.append(GSNode((float(p3.x), float(p3.y)), CURVE))
+        start_node = None
+        for _p0, p1, p2, p3 in bez_segments:
+            path.nodes.append(self._make_gs_node(p1, OFFCURVE))
+            path.nodes.append(self._make_gs_node(p2, OFFCURVE))
+            start_node = self._make_gs_node(p3, CURVE, smooth=True)
+            path.nodes.append(start_node)
         path.closed = True
-        if hole:
-            self._reverse_gs_path(path)
+        self._make_node_first(path, start_node)
         return path
 
     @objc.python_method
@@ -1080,9 +1136,9 @@ class HofmannTool(SelectTool):
         # For filled closed paths, the first on-curve doubles as the closing-arc
         # endpoint. Line mode may still include that arc, but remains open.
         first_type = CURVE if path_closed and closing_bez_segments else LINE
-        path.nodes.append(GSNode((float(first.point_a.x), float(first.point_a.y)), first_type))
+        path.nodes.append(self._make_gs_node(first.point_a, first_type, smooth=(first_type == CURVE)))
         for index, seg in enumerate(segments):
-            path.nodes.append(GSNode((float(seg.point_b.x), float(seg.point_b.y)), LINE))
+            path.nodes.append(self._make_gs_node(seg.point_b, LINE))
             if index + 1 < len(segments):
                 next_seg = segments[index + 1]
                 self._append_bezier_arc_to_gs_path(
@@ -1110,10 +1166,10 @@ class HofmannTool(SelectTool):
     def _append_bezier_segments_to_gs_path(self, path, bez_segments, final_curve=True):
         last_index = len(bez_segments) - 1
         for index, (_p0, p1, p2, p3) in enumerate(bez_segments):
-            path.nodes.append(GSNode((float(p1.x), float(p1.y)), OFFCURVE))
-            path.nodes.append(GSNode((float(p2.x), float(p2.y)), OFFCURVE))
+            path.nodes.append(self._make_gs_node(p1, OFFCURVE))
+            path.nodes.append(self._make_gs_node(p2, OFFCURVE))
             if final_curve or index < last_index:
-                path.nodes.append(GSNode((float(p3.x), float(p3.y)), CURVE))
+                path.nodes.append(self._make_gs_node(p3, CURVE, smooth=True))
 
     @objc.python_method
     def _append_path_to_layer(self, layer, path):

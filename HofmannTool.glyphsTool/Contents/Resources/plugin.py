@@ -89,7 +89,7 @@ class HofmannTool(SelectTool):
             "en": "Hofmann Tool",
             "ja": "Hofmann Tool",
         })
-        self.keyboardShortcut = "h"
+        self.keyboardShortcut = None
         self.loadNib("InspectorView", __file__)
         self._localize_ui()
         self._apply_readable_colours()

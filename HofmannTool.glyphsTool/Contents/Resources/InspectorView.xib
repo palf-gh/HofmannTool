@@ -11,19 +11,25 @@
                 <outlet property="applyButton" destination="applyButton" id="out-apply"/>
                 <outlet property="clearButton" destination="clearButton" id="out-clear"/>
                 <outlet property="colsLabel" destination="labelCols" id="out-label-cols"/>
+                <outlet property="colsStepper" destination="colsStepper" id="out-cols-stepper"/>
                 <outlet property="colsTextField" destination="colsField" id="out-cols"/>
                 <outlet property="diameterLabel" destination="labelDiameter" id="out-label-diameter"/>
+                <outlet property="diameterStepper" destination="diameterStepper" id="out-diameter-stepper"/>
                 <outlet property="diameterTextField" destination="diameterField" id="out-diameter"/>
                 <outlet property="inspectorDialog" destination="inspectorView" id="out-dialog"/>
                 <outlet property="inspectorDialogView" destination="inspectorView" id="out-dialog-view"/>
                 <outlet property="outputModeSegmentedControl" destination="outputMode" id="out-output"/>
                 <outlet property="rowsLabel" destination="labelRows" id="out-label-rows"/>
+                <outlet property="rowsStepper" destination="rowsStepper" id="out-rows-stepper"/>
                 <outlet property="rowsTextField" destination="rowsField" id="out-rows"/>
                 <outlet property="spacingLabel" destination="labelSpacing" id="out-label-spacing"/>
+                <outlet property="spacingStepper" destination="spacingStepper" id="out-spacing-stepper"/>
                 <outlet property="spacingTextField" destination="spacingField" id="out-spacing"/>
                 <outlet property="xOffsetLabel" destination="labelXOffset" id="out-label-xoffset"/>
+                <outlet property="xOffsetStepper" destination="xOffsetStepper" id="out-xoffset-stepper"/>
                 <outlet property="xOffsetTextField" destination="xOffsetField" id="out-xoffset"/>
                 <outlet property="yOffsetLabel" destination="labelYOffset" id="out-label-yoffset"/>
+                <outlet property="yOffsetStepper" destination="yOffsetStepper" id="out-yoffset-stepper"/>
                 <outlet property="yOffsetTextField" destination="yOffsetField" id="out-yoffset"/>
             </connections>
         </customObject>
@@ -33,13 +39,13 @@
             <rect key="frame" x="0.0" y="0.0" width="326" height="96"/>
             <subviews>
                 <textField id="labelRows" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="8" y="68" width="16" height="17"/>
+                    <rect key="frame" x="8" y="68" width="14" height="17"/>
                     <textFieldCell key="cell" controlSize="small" title="R" id="cell-labelRows">
                         <font key="font" metaFont="smallSystem"/>
                     </textFieldCell>
                 </textField>
                 <textField id="rowsField" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="25" y="65" width="36" height="22"/>
+                    <rect key="frame" x="23" y="65" width="24" height="22"/>
                     <textFieldCell key="cell" controlSize="small" scrollable="YES" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" alignment="right" title="4" drawsBackground="YES" id="cell-rowsField">
                         <font key="font" metaFont="smallSystem"/>
                     </textFieldCell>
@@ -47,14 +53,21 @@
                         <action selector="handleSettingsAction:" target="-2" id="act-rows"/>
                     </connections>
                 </textField>
+                <stepper id="rowsStepper" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
+                    <rect key="frame" x="47" y="65" width="19" height="22"/>
+                    <stepperCell key="cell" controlSize="small" continuous="YES" alignment="left" minValue="1" maxValue="64" doubleValue="4" increment="1" id="cell-rowsStepper"/>
+                    <connections>
+                        <action selector="stepperAction:" target="-2" id="act-rows-stepper"/>
+                    </connections>
+                </stepper>
                 <textField id="labelCols" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="68" y="68" width="16" height="17"/>
+                    <rect key="frame" x="70" y="68" width="14" height="17"/>
                     <textFieldCell key="cell" controlSize="small" title="C" id="cell-labelCols">
                         <font key="font" metaFont="smallSystem"/>
                     </textFieldCell>
                 </textField>
                 <textField id="colsField" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="85" y="65" width="36" height="22"/>
+                    <rect key="frame" x="85" y="65" width="24" height="22"/>
                     <textFieldCell key="cell" controlSize="small" scrollable="YES" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" alignment="right" title="4" drawsBackground="YES" id="cell-colsField">
                         <font key="font" metaFont="smallSystem"/>
                     </textFieldCell>
@@ -62,14 +75,21 @@
                         <action selector="handleSettingsAction:" target="-2" id="act-cols"/>
                     </connections>
                 </textField>
+                <stepper id="colsStepper" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
+                    <rect key="frame" x="109" y="65" width="19" height="22"/>
+                    <stepperCell key="cell" controlSize="small" continuous="YES" alignment="left" minValue="1" maxValue="64" doubleValue="4" increment="1" id="cell-colsStepper"/>
+                    <connections>
+                        <action selector="stepperAction:" target="-2" id="act-cols-stepper"/>
+                    </connections>
+                </stepper>
                 <textField id="labelSpacing" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="130" y="68" width="46" height="17"/>
+                    <rect key="frame" x="132" y="68" width="46" height="17"/>
                     <textFieldCell key="cell" controlSize="small" title="Spacing" id="cell-labelSpacing">
                         <font key="font" metaFont="smallSystem"/>
                     </textFieldCell>
                 </textField>
                 <textField id="spacingField" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="176" y="65" width="50" height="22"/>
+                    <rect key="frame" x="180" y="65" width="37" height="22"/>
                     <textFieldCell key="cell" controlSize="small" scrollable="YES" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" alignment="right" title="120" drawsBackground="YES" id="cell-spacingField">
                         <font key="font" metaFont="smallSystem"/>
                     </textFieldCell>
@@ -77,14 +97,21 @@
                         <action selector="handleSettingsAction:" target="-2" id="act-spacing"/>
                     </connections>
                 </textField>
+                <stepper id="spacingStepper" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
+                    <rect key="frame" x="217" y="65" width="19" height="22"/>
+                    <stepperCell key="cell" controlSize="small" continuous="YES" alignment="left" minValue="1" maxValue="5000" doubleValue="120" increment="10" id="cell-spacingStepper"/>
+                    <connections>
+                        <action selector="stepperAction:" target="-2" id="act-spacing-stepper"/>
+                    </connections>
+                </stepper>
                 <textField id="labelDiameter" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="236" y="68" width="30" height="17"/>
+                    <rect key="frame" x="240" y="68" width="30" height="17"/>
                     <textFieldCell key="cell" controlSize="small" title="Dia" id="cell-labelDiameter">
                         <font key="font" metaFont="smallSystem"/>
                     </textFieldCell>
                 </textField>
                 <textField id="diameterField" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="270" y="65" width="50" height="22"/>
+                    <rect key="frame" x="272" y="65" width="35" height="22"/>
                     <textFieldCell key="cell" controlSize="small" scrollable="YES" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" alignment="right" title="80" drawsBackground="YES" id="cell-diameterField">
                         <font key="font" metaFont="smallSystem"/>
                     </textFieldCell>
@@ -92,6 +119,13 @@
                         <action selector="handleSettingsAction:" target="-2" id="act-diameter"/>
                     </connections>
                 </textField>
+                <stepper id="diameterStepper" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
+                    <rect key="frame" x="307" y="65" width="19" height="22"/>
+                    <stepperCell key="cell" controlSize="small" continuous="YES" alignment="left" minValue="1" maxValue="5000" doubleValue="80" increment="10" id="cell-diameterStepper"/>
+                    <connections>
+                        <action selector="stepperAction:" target="-2" id="act-diameter-stepper"/>
+                    </connections>
+                </stepper>
                 <textField id="labelXOffset" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
                     <rect key="frame" x="8" y="39" width="14" height="17"/>
                     <textFieldCell key="cell" controlSize="small" title="X" id="cell-labelXOffset">
@@ -99,7 +133,7 @@
                     </textFieldCell>
                 </textField>
                 <textField id="xOffsetField" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="26" y="36" width="48" height="22"/>
+                    <rect key="frame" x="24" y="36" width="33" height="22"/>
                     <textFieldCell key="cell" controlSize="small" scrollable="YES" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" alignment="right" title="0" drawsBackground="YES" id="cell-xOffsetField">
                         <font key="font" metaFont="smallSystem"/>
                     </textFieldCell>
@@ -107,6 +141,13 @@
                         <action selector="handleSettingsAction:" target="-2" id="act-xoffset"/>
                     </connections>
                 </textField>
+                <stepper id="xOffsetStepper" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
+                    <rect key="frame" x="57" y="36" width="19" height="22"/>
+                    <stepperCell key="cell" controlSize="small" continuous="YES" alignment="left" minValue="-5000" maxValue="5000" doubleValue="0" increment="10" id="cell-xOffsetStepper"/>
+                    <connections>
+                        <action selector="stepperAction:" target="-2" id="act-xoffset-stepper"/>
+                    </connections>
+                </stepper>
                 <textField id="labelYOffset" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
                     <rect key="frame" x="82" y="39" width="14" height="17"/>
                     <textFieldCell key="cell" controlSize="small" title="Y" id="cell-labelYOffset">
@@ -114,7 +155,7 @@
                     </textFieldCell>
                 </textField>
                 <textField id="yOffsetField" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
-                    <rect key="frame" x="100" y="36" width="48" height="22"/>
+                    <rect key="frame" x="98" y="36" width="33" height="22"/>
                     <textFieldCell key="cell" controlSize="small" scrollable="YES" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" alignment="right" title="0" drawsBackground="YES" id="cell-yOffsetField">
                         <font key="font" metaFont="smallSystem"/>
                     </textFieldCell>
@@ -122,6 +163,13 @@
                         <action selector="handleSettingsAction:" target="-2" id="act-yoffset"/>
                     </connections>
                 </textField>
+                <stepper id="yOffsetStepper" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
+                    <rect key="frame" x="131" y="36" width="19" height="22"/>
+                    <stepperCell key="cell" controlSize="small" continuous="YES" alignment="left" minValue="-5000" maxValue="5000" doubleValue="0" increment="10" id="cell-yOffsetStepper"/>
+                    <connections>
+                        <action selector="stepperAction:" target="-2" id="act-yoffset-stepper"/>
+                    </connections>
+                </stepper>
                 <segmentedControl id="outputMode" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO">
                     <rect key="frame" x="160" y="35" width="160" height="24"/>
                     <segmentedCell key="cell" borderStyle="border" alignment="left" segmentDistribution="fillEqually" style="roundRect" trackingMode="selectOne" id="cell-outputMode">

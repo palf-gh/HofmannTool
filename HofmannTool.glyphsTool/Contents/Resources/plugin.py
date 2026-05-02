@@ -79,6 +79,12 @@ class HofmannTool(SelectTool):
     diameterTextField = objc.IBOutlet()
     xOffsetTextField = objc.IBOutlet()
     yOffsetTextField = objc.IBOutlet()
+    rowsStepper = objc.IBOutlet()
+    colsStepper = objc.IBOutlet()
+    spacingStepper = objc.IBOutlet()
+    diameterStepper = objc.IBOutlet()
+    xOffsetStepper = objc.IBOutlet()
+    yOffsetStepper = objc.IBOutlet()
     outputModeSegmentedControl = objc.IBOutlet()
     applyButton = objc.IBOutlet()
     clearButton = objc.IBOutlet()
@@ -208,6 +214,7 @@ class HofmannTool(SelectTool):
         self._set_field_value(self.diameterTextField, s["diameter"])
         self._set_field_value(self.xOffsetTextField, s["xOffset"])
         self._set_field_value(self.yOffsetTextField, s["yOffset"])
+        self._sync_steppers_to_settings(s)
         if self.outputModeSegmentedControl:
             mode_to_segment = {"filled": 0, "hole": 1, "centerline": 2}
             self.outputModeSegmentedControl.setSelectedSegment_(mode_to_segment.get(s["outputMode"], 0))
@@ -233,7 +240,22 @@ class HofmannTool(SelectTool):
         d[PREF + ".xOffset"] = s["xOffset"]
         d[PREF + ".yOffset"] = s["yOffset"]
         d[PREF + ".outputMode"] = s["outputMode"]
+        self._sync_steppers_to_settings(s)
         return s
+
+    @objc.python_method
+    def _sync_steppers_to_settings(self, s):
+        pairs = (
+            (self.rowsStepper, s["rows"]),
+            (self.colsStepper, s["cols"]),
+            (self.spacingStepper, s["spacing"]),
+            (self.diameterStepper, s["diameter"]),
+            (self.xOffsetStepper, s["xOffset"]),
+            (self.yOffsetStepper, s["yOffset"]),
+        )
+        for stepper, value in pairs:
+            if stepper is not None:
+                stepper.setDoubleValue_(float(value))
 
     @objc.python_method
     def _set_field_value(self, field, value):
@@ -872,6 +894,37 @@ class HofmannTool(SelectTool):
                 NSMakePoint(p1.x, p1.y),
                 NSMakePoint(p2.x, p2.y),
             )
+
+    @objc.IBAction
+    def stepperAction_(self, sender):
+        if sender is None:
+            return
+        try:
+            value = float(sender.doubleValue())
+        except Exception:
+            return
+        mapping = (
+            (self.rowsStepper, self.rowsTextField, True),
+            (self.colsStepper, self.colsTextField, True),
+            (self.spacingStepper, self.spacingTextField, False),
+            (self.diameterStepper, self.diameterTextField, False),
+            (self.xOffsetStepper, self.xOffsetTextField, False),
+            (self.yOffsetStepper, self.yOffsetTextField, False),
+        )
+        target_field = None
+        is_int = False
+        for stepper, field, int_flag in mapping:
+            if stepper is sender:
+                target_field = field
+                is_int = int_flag
+                break
+        if target_field is None:
+            return
+        if is_int:
+            target_field.setStringValue_(str(int(value)))
+        else:
+            target_field.setStringValue_("%g" % value)
+        self.handleSettingsAction_(sender)
 
     @objc.IBAction
     def handleSettingsAction_(self, sender):

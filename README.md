@@ -42,9 +42,9 @@ direction), or an open centerline.
    ```
 
 3. Restart Glyphs 3 and pick **Hofmann Tool** from the toolbar. No keyboard
-   shortcut is assigned by default; you can bind one in
-   `System Settings → Keyboard → Keyboard Shortcuts → App Shortcuts` if you
-   like.
+   shortcut is assigned by default. If you want one, edit
+   `HofmannTool.glyphsTool/Contents/Resources/plugin.py` and set
+   `self.keyboardShortcut` in `settings()` to the letter you prefer.
 
 ### Usage
 
@@ -152,9 +152,10 @@ Apache License 2.0. See [LICENSE](LICENSE).
    ```
 
 3. Glyphs 3 を再起動し、ツールバーから **Hofmann Tool** を選びます。
-   ショートカットはデフォルトでは未割り当てです。必要なら macOS の
-   「システム設定 → キーボード → キーボードショートカット → アプリの
-   ショートカット」から好きなキーを割り当ててください。
+   ショートカットはデフォルトでは未割り当てです。割り当てたい場合は
+   `HofmannTool.glyphsTool/Contents/Resources/plugin.py` の
+   `settings()` 内の `self.keyboardShortcut` を好きな文字に書き換えて
+   ください。
 
 ### 使い方
 

@@ -94,6 +94,7 @@ SDK:
 - 確定プレビューは「接線直線 + 各コーナー円弧」を表示。閉じた contour では closePath。
 - 選択済みルートは node/flow の履歴として保持し、`Diameter`, `Spacing`, offset 変更時に現在設定で接線を再計算する。
 - `Cmd+Z` / `Shift+Cmd+Z` でツール内の選択履歴を undo/redo できる。`Clear` も undo 対象。
+- ツール内履歴がある間は Edit メニューの Undo/Redo ターゲットを HofmannTool に一時差し替えし、Glyphs 本来の Undo/Redo が同時に走らないようにする。履歴が空になるかツールを離れたら復元する。
 - `Apply`:
   - `Line` モード: open でも closed でも `GSPath` を生成して active layer に追加。closed contour でも `GSPath.closed=False` のままにし、塗り形状にはしない。
   - `Filled` モード: closed のときだけ `GSPath.closed=True` で追加、未 closed 時はコンソール警告。
@@ -122,6 +123,7 @@ SDK:
 - 「グリッド/ノード/候補は常時表示、ラベル不要」 → 対応済 (表示チェックボックスとラベル描画を削除)。
 - 「半径変更時に既存分も追随」 → 対応済 (node/flow から接線を再計算)。
 - 「戻すボタンを排除して Cmd+Z / Shift+Cmd+Z」 → 対応済 (ツール内履歴 100 件)。
+- 「既存の Cmd+Z / Shift+Cmd+Z も機能してしまう」 → 対応済 (ツール内履歴中だけ Edit メニューの Undo/Redo を一時的に横取り)。
 - いったん Claude に投げられるよう、仕様書、参考コード、現状修正点をまとめたい → 本ドキュメント。
 
 ## 期待仕様
@@ -244,6 +246,7 @@ Undo integration:
 - Apply/Undo/Clear のタイトル色オーバーライドを停止 (システム既定の bezel が活きるように)。
 - 表示チェックボックスと Undo ボタンを削除し、Inspector 高さを `96` に縮小。
 - ツール内履歴を追加し、`Cmd+Z` / `Shift+Cmd+Z` で選択、候補表示、候補確定、Clear を undo/redo 可能にした。
+- ツール内履歴がある間は Edit メニューの Undo/Redo を一時的に HofmannTool へ向け、履歴が空になったら元の target/action に戻す。
 
 ## 次に直すべき順番
 
@@ -261,7 +264,7 @@ Undo integration:
 7. Apply 時の Glyphs Undo メニュー名指定。
    - `layer.beginChanges()` 周りで `Glyphs.font.parent.windowController().undoManager()` を取得して
      `setActionName_("Apply Hofmann Tangents")` を呼べるか確認する。
-   - ただしツール内に undo 履歴があるときは `Cmd+Z` をツール側で消費する。Apply 後はツール履歴をクリアするため、Glyphs 側 undo に戻る想定。
+   - ツール内に undo/redo 履歴があるときは `Cmd+Z` / `Shift+Cmd+Z` をツール側で消費する。Apply 後はツール履歴をクリアするため、Glyphs 側 undo に戻る想定。
 8. Geometry tests の追補。
    - flow 継続失敗時に候補が空になること。
    - Bezier 円弧が flow 方向どおりに進むこと (現テストで CCW/CW を確認済)。

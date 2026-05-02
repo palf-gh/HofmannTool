@@ -8,11 +8,13 @@ import objc
 from GlyphsApp import Glyphs, GSPath, GSNode, LINE, CURVE, OFFCURVE
 from GlyphsApp.plugins import SelectTool
 from AppKit import (
+    NSApplication,
     NSBezierPath,
     NSColor,
     NSMakePoint,
     NSMakeRect,
 )
+from Foundation import NSSelectorFromString
 
 try:
     from AppKit import NSEventModifierFlagCommand, NSEventModifierFlagShift
@@ -95,6 +97,8 @@ class HofmannTool(SelectTool):
     def start(self):
         self._undo_stack = []
         self._redo_stack = []
+        self._tool_is_active = False
+        self._menu_override_records = []
         self._reset_interaction_state()
 
     def view(self):
@@ -102,10 +106,14 @@ class HofmannTool(SelectTool):
 
     @objc.python_method
     def activate(self):
+        self._tool_is_active = True
+        self._sync_edit_undo_menu_override()
         Glyphs.redraw()
 
     @objc.python_method
     def deactivate(self):
+        self._tool_is_active = False
+        self._restore_edit_undo_menu_override()
         Glyphs.redraw()
 
     @objc.python_method
@@ -282,8 +290,90 @@ class HofmannTool(SelectTool):
             self._undo_stack = []
         if not hasattr(self, "_redo_stack"):
             self._redo_stack = []
+        if not hasattr(self, "_tool_is_active"):
+            self._tool_is_active = False
+        if not hasattr(self, "_menu_override_records"):
+            self._menu_override_records = []
         if not hasattr(self, "_route_steps"):
             self._reset_interaction_state()
+
+    @objc.python_method
+    def _has_tool_undo(self):
+        self._ensure_interaction_storage()
+        return bool(self._undo_stack)
+
+    @objc.python_method
+    def _has_tool_redo(self):
+        self._ensure_interaction_storage()
+        return bool(self._redo_stack)
+
+    @objc.python_method
+    def _should_override_edit_undo(self):
+        self._ensure_interaction_storage()
+        return self._tool_is_active and (self._has_tool_undo() or self._has_tool_redo())
+
+    @objc.python_method
+    def _iter_menu_items(self, menu):
+        if menu is None:
+            return
+        for index in range(menu.numberOfItems()):
+            item = menu.itemAtIndex_(index)
+            yield item
+            submenu = item.submenu()
+            if submenu is not None:
+                for submenu_item in self._iter_menu_items(submenu):
+                    yield submenu_item
+
+    @objc.python_method
+    def _undo_redo_menu_items(self):
+        found = {"undo": None, "redo": None}
+        try:
+            main_menu = NSApplication.sharedApplication().mainMenu()
+        except Exception:
+            return found
+        for item in self._iter_menu_items(main_menu):
+            try:
+                key = item.keyEquivalent().lower()
+                mask = item.keyEquivalentModifierMask()
+            except Exception:
+                continue
+            if key != "z" or not (mask & NSEventModifierFlagCommand):
+                continue
+            if mask & NSEventModifierFlagShift:
+                found["redo"] = item
+            else:
+                found["undo"] = item
+        return found
+
+    @objc.python_method
+    def _sync_edit_undo_menu_override(self):
+        self._ensure_interaction_storage()
+        if not self._should_override_edit_undo():
+            self._restore_edit_undo_menu_override()
+            return
+        if self._menu_override_records:
+            return
+        items = self._undo_redo_menu_items()
+        for key, selector_name in (("undo", "undo:"), ("redo", "redo:")):
+            item = items.get(key)
+            if item is None:
+                continue
+            self._menu_override_records.append((item, item.target(), item.action()))
+            item.setTarget_(self)
+            item.setAction_(NSSelectorFromString(selector_name))
+
+    @objc.python_method
+    def _restore_edit_undo_menu_override(self):
+        if not hasattr(self, "_menu_override_records"):
+            self._menu_override_records = []
+            return
+        for item, target, action in self._menu_override_records:
+            try:
+                item.setTarget_(target)
+                item.setAction_(action)
+            except Exception:
+                pass
+        self._menu_override_records = []
 
     @objc.python_method
     def _reset_interaction_state(self):
@@ -358,6 +448,7 @@ class HofmannTool(SelectTool):
         if len(self._undo_stack) > MAX_HISTORY:
             del self._undo_stack[0]
         self._redo_stack = []
+        self._sync_edit_undo_menu_override()
 
     @objc.python_method
     def _undo_history(self):
@@ -370,6 +461,7 @@ class HofmannTool(SelectTool):
         if len(self._redo_stack) > MAX_HISTORY:
             del self._redo_stack[0]
         self._restore_state(previous)
+        self._sync_edit_undo_menu_override()
         return True
 
     @objc.python_method
@@ -383,6 +475,7 @@ class HofmannTool(SelectTool):
         if len(self._undo_stack) > MAX_HISTORY:
             del self._undo_stack[0]
         self._restore_state(next_snapshot)
+        self._sync_edit_undo_menu_override()
         return True
 
     @objc.python_method
@@ -501,6 +594,25 @@ class HofmannTool(SelectTool):
             objc.super(HofmannTool, self).keyDown_(event)
         except AttributeError:
             pass
+
+    def undo_(self, sender):
+        if self._undo_history():
+            Glyphs.redraw()
+
+    def redo_(self, sender):
+        if self._redo_history():
+            Glyphs.redraw()
+
+    def validateMenuItem_(self, menu_item):
+        try:
+            action_name = str(menu_item.action())
+        except Exception:
+            return True
+        if "undo:" in action_name:
+            return self._has_tool_undo()
+        if "redo:" in action_name:
+            return self._has_tool_redo()
+        return True
 
     @objc.python_method
     def _handle_node_click(self, layer, node, s):
@@ -779,6 +891,7 @@ class HofmannTool(SelectTool):
         self._undo_stack = []
         self._redo_stack = []
         self._reset_interaction_state()
+        self._sync_edit_undo_menu_override()
         Glyphs.redraw()
 
     @objc.python_method
@@ -865,6 +978,7 @@ class HofmannTool(SelectTool):
         if self._has_interaction_state():
             self._push_history()
             self._reset_interaction_state()
+            self._sync_edit_undo_menu_override()
             Glyphs.redraw()
 
     @objc.python_method

@@ -24,9 +24,8 @@ direction), or an open centerline.
 - `Filled`, `Hole`, and `Line` output modes. `Hole` writes the same closed
   contour with reversed direction so it counts as an inner contour.
 - `Cmd`-click on a grid node to drop a single closed circle at that node,
-  bypassing the route flow. The current direction mode is respected.
-- `Cmd+Shift`-click flips the direction, so you can drop a hole while staying
-  in `Filled` mode (and vice versa).
+  bypassing the route flow. The direction follows the current mode (`Filled`
+  → CCW, `Hole` → CW).
 - Tool-local `Cmd+Z` / `Shift+Cmd+Z` history for selection and route steps.
   Glyphs' own undo is paused while the tool history has entries.
 - Inspector localized in English and Japanese.
@@ -58,7 +57,8 @@ direction), or an open centerline.
 5. Pick `Filled`, `Hole`, or `Line` and press **Apply** to write a `GSPath`
    to the active layer.
 6. Hold `Cmd` and click any grid node to drop a single circle at that node.
-   Use `Cmd+Shift`-click to drop one with the opposite direction.
+   The direction follows the current mode, so switch to `Hole` first if you
+   want a reversed (inner) circle.
 
 `Clear` resets the in-progress route. `Cmd+Z` / `Shift+Cmd+Z` undo and redo
 route steps and clears, but only while the tool has its own history.
@@ -72,7 +72,7 @@ Stored under the key prefix `com.palf.HofmannTool.<setting>` in
 | --- | --- | --- | --- |
 | `rows` | int | 4 | Grid row count |
 | `cols` | int | 4 | Grid column count |
-| `spacing` | float | 120 | Spacing between grid nodes (units) |
+| `spacing` | float | 40 | Edge-to-edge gap between adjacent circles (units). The grid step is `diameter + spacing`. |
 | `diameter` | float | 80 | Circle diameter (units) |
 | `xOffset` | float | 0 | Horizontal offset of the grid (units) |
 | `yOffset` | float | 0 | Vertical offset of the grid (units) |
@@ -133,9 +133,8 @@ Apache License 2.0. See [LICENSE](LICENSE).
 - 出力モード `Filled` / `Hole` / `Line`。`Hole` は同じ閉じパスを向き反転して
   穴として使えるようにします。
 - `Cmd` を押しながらノードをクリックすると、ルート編集とは独立にその位置に
-  単独の閉じた円を書き出します。向きは現在のモードに従います。
-- `Cmd+Shift`+クリックで向きを反転できるので、`Filled` モードのまま穴を
-  落としたり、その逆を行ったりできます。
+  単独の閉じた円を書き出します。向きは現在のモードに従います（`Filled`
+  なら CCW、`Hole` なら CW）。
 - ツール内の `Cmd+Z` / `Shift+Cmd+Z` 履歴で選択・候補・確定・Clear を
   undo/redo できます。ツール履歴が残っている間は Glyphs 本体の Undo は
   一時的に止まります。
@@ -168,7 +167,8 @@ Apache License 2.0. See [LICENSE](LICENSE).
 5. `Filled` / `Hole` / `Line` を選び **Apply** を押すと `GSPath` が
    アクティブレイヤーに追加されます。
 6. `Cmd` を押しながら任意のノードをクリックすると、そのノードに単独の円が
-   書き出されます。`Cmd+Shift`+クリックで向きを反転した円（穴）を落とせます。
+   書き出されます。穴向きにしたいときは出力モードを先に `Hole` に切り替えて
+   ください。
 
 `Clear` で組み立て中のルートをリセットできます。`Cmd+Z` / `Shift+Cmd+Z` は
 ツール履歴がある間のみ、ルートステップや Clear を undo / redo します。
@@ -181,7 +181,7 @@ Apache License 2.0. See [LICENSE](LICENSE).
 | --- | --- | --- | --- |
 | `rows` | int | 4 | 行数 |
 | `cols` | int | 4 | 列数 |
-| `spacing` | float | 120 | グリッド間隔（ユニット） |
+| `spacing` | float | 40 | 隣り合う円の縁同士の間隔（ユニット）。グリッドの中心間隔は `diameter + spacing` になります。 |
 | `diameter` | float | 80 | 円の直径（ユニット） |
 | `xOffset` | float | 0 | グリッド水平オフセット（ユニット） |
 | `yOffset` | float | 0 | グリッド垂直オフセット（ユニット） |

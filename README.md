@@ -56,10 +56,14 @@ direction), or an open centerline.
      "$HOME/Library/Application Support/Glyphs 3/Plugins/HofmannTool.glyphsTool"
    ```
 
-3. Restart Glyphs 3 and pick **Hofmann Tool** from the toolbar (default
-   shortcut `H`).
-   Glyphs 3 を再起動し、ツールバーから **Hofmann Tool** を選びます
-   （デフォルトショートカット `H`）。
+3. Restart Glyphs 3 and pick **Hofmann Tool** from the toolbar. No keyboard
+   shortcut is assigned by default; you can bind one in
+   `System Settings → Keyboard → Keyboard Shortcuts → App Shortcuts` if you
+   like.
+   Glyphs 3 を再起動し、ツールバーから **Hofmann Tool** を選びます。
+   ショートカットはデフォルトでは未割り当てです。必要なら macOS の
+   「システム設定 → キーボード → キーボードショートカット → アプリの
+   ショートカット」から好きなキーを割り当ててください。
 
 ## Usage / 使い方
 
